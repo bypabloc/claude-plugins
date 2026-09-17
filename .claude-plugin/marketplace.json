@@ -16,10 +16,7 @@
         "email": "pacg1991@gmail.com"
       },
       "category": "development",
-      "source": {
-        "source": "url",
-        "url": "https://github.com/bypabloc/claude-plugin-spanish-latam.git"
-      },
+      "source": "./plugins/spanish-latam-style",
       "homepage": "https://github.com/bypabloc/claude-plugin-spanish-latam"
     }
   ]

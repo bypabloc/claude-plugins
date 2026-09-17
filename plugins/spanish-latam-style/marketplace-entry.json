@@ -1,0 +1,16 @@
+{
+  "name": "spanish-latam-style",
+  "description": "Aplica y refuerza el uso estricto de español neutro latinoamericano estándar (tuteo profesional, sin voseo ni modismos regionales) en interacciones, documentación, commits y código en Claude Code.",
+  "author": {
+    "name": "Pablo Contreras",
+    "email": "pacg1991@gmail.com",
+    "url": "https://github.com/bypabloc"
+  },
+  "category": "development",
+  "source": {
+    "source": "github",
+    "url": "https://github.com/bypabloc/claude-plugin-spanish-latam.git",
+    "ref": "main"
+  },
+  "homepage": "https://github.com/bypabloc/claude-plugin-spanish-latam"
+}
