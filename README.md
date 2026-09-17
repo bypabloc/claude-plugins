@@ -11,20 +11,28 @@ Aplica y refuerza el uso estricto de **español neutro latinoamericano estándar
 
 ---
 
-## Cómo Añadir este Marketplace a Claude Code
+## Guía Rápida de Instalación (2 Comandos)
 
-Ejecuta el siguiente comando en tu terminal:
+Cualquier usuario puede instalar el plugin en Claude Code ejecutando:
 
 ```bash
+# 1. Registrar el marketplace (solo una vez)
 claude plugin marketplace add bypabloc/claude-plugins
-```
 
-## Cómo Instalar Plugins
-
-Una vez añadido el marketplace:
-
-```bash
+# 2. Instalar el plugin
 claude plugin install spanish-latam-style@bypabloc
 ```
 
-O desde la interfaz interactiva dentro de una sesión de Claude Code con `/plugin`.
+> [!NOTE]
+> Si no tienes llaves SSH de GitHub configuradas en tu terminal, puedes utilizar la URL HTTPS pública en el primer comando:
+> ```bash
+> claude plugin marketplace add https://github.com/bypabloc/claude-plugins
+> claude plugin install spanish-latam-style@bypabloc
+> ```
+
+### Comprobar la instalación
+```bash
+claude plugin list
+claude plugin details spanish-latam-style
+```
+

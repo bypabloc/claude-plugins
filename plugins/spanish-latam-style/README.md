@@ -67,21 +67,34 @@ Este plugin introduce una regla reforzada construida con técnicas avanzadas de 
 
 ---
 
-## 4. Guía de Instalación (Paso a Paso)
+## 4. Guía de Instalación Rápida (2 Comandos)
 
-### Método A: Instalación vía Claude Marketplace (Recomendado)
-
-Solo debes ejecutar dos comandos en tu terminal:
+Cualquier usuario puede instalar y activar el plugin en Claude Code ejecutando estos dos comandos en su terminal:
 
 ```bash
-# 1. Registrar el marketplace de bypabloc (solo una vez)
+# 1. Registrar el marketplace público de bypabloc (solo una vez)
 claude plugin marketplace add bypabloc/claude-plugins
 
-# 2. Instalar el plugin globalmente
+# 2. Instalar y habilitar el plugin
 claude plugin install spanish-latam-style@bypabloc
 ```
 
-¡Listo! A partir de ese momento, Claude Code aplicará la regla en todas tus sesiones.
+> [!NOTE]
+> Si en tu terminal no tienes configuradas llaves SSH para GitHub, puedes utilizar alternativamente la URL HTTPS pública en el primer comando:
+> ```bash
+> claude plugin marketplace add https://github.com/bypabloc/claude-plugins
+> claude plugin install spanish-latam-style@bypabloc
+> ```
+
+### Comprobar la instalación:
+Para verificar que el plugin está activo y ver el inventario de componentes (5 skills, 1 lifecycle hook):
+
+```bash
+claude plugin list
+claude plugin details spanish-latam-style
+```
+
+¡Listo! A partir de ese momento, Claude Code aplicará la regla en todas tus sesiones automáticamente.
 
 ---
 
