@@ -1,13 +1,24 @@
 {
-  "description": "Inyecta las directrices de espanol neutro latinoamericano en cada sesion de Claude Code",
+  "description": "Inyecta y refuerza las directrices de espanol neutro latinoamericano en cada sesion y consulta de Claude Code",
   "hooks": {
     "SessionStart": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/session-start.sh\"",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/session-start.cjs\"",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/user-prompt-submit.cjs\"",
+            "timeout": 5
           }
         ]
       }
