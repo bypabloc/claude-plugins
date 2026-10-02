@@ -22,7 +22,7 @@
     {
       "name": "synapse",
       "description": "Sistema de guardrails de seguridad y protección determinística/neuronal en tiempo real para Claude Code (Laya System 1 + Fallback).",
-      "version": "1.0.2",
+      "version": "1.1.0",
       "author": {
         "name": "Pablo Contreras",
         "email": "pacg1991@gmail.com",
