@@ -107,6 +107,52 @@ def test_ambiguous_commands_still_reach_laya(tmp_path, command: str) -> None:
     router.predict.assert_called_once()
 
 
+@pytest.mark.parametrize(
+    "command",
+    [
+        "uv lock",
+        "uv sync --all-groups",
+        "uv lock --directory server",
+        "cd server && uv sync --frozen",
+        "bun install --frozen-lockfile",
+        "pnpm install",
+        "uv lock 2>&1 | tail -5",
+        "uv sync > tmp/sync.log 2>&1",
+    ],
+)
+def test_lockfile_sync_skips_laya(tmp_path, command: str) -> None:
+    decision, router = run("block_dangerous", "Bash", {"command": command}, tmp_path)
+    assert decision == "pass"
+    router.predict.assert_not_called()
+
+
+def test_lockfile_sync_with_absolute_directory_inside_project_skips_laya(tmp_path) -> None:
+    (tmp_path / "server").mkdir()
+    decision, router = run("block_dangerous", "Bash", {"command": f"uv lock --directory {tmp_path}/server"}, tmp_path)
+    assert decision == "pass"
+    router.predict.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "uv add requests",
+        "uv sync && python3 scripts/migrate.py",
+        "uv run pytest",
+        "uv pip install requests",
+        "bun install left-pad",
+        "bun install -g some-cli",
+        "pnpm install --global some-cli",
+        "uv lock --directory " + "../" * 12 + "etc",
+        "uv lock > src/out.txt",
+        "uv sync $(cat flags.txt)",
+    ],
+)
+def test_package_changes_still_reach_laya(tmp_path, command: str) -> None:
+    _, router = run("block_dangerous", "Bash", {"command": command}, tmp_path)
+    router.predict.assert_called_once()
+
+
 def test_permanent_delete_asks_without_laya() -> None:
     # tmp_path vive bajo ./tmp/ (desechable): el archivo rastreado tiene que estar en un repo real
     repo = make_git_repo("gate_delete", tracked={"src/app.py": "x = 1\n"}, untracked={})
@@ -196,6 +242,8 @@ def test_ambiguous_sensitive_name_reaches_laya(tmp_path) -> None:
         '{"password": "Contraseña", "token_expired": "Tu sesión expiró, vuelve a ingresar"}',
         "def refresh_token(self, key: str) -> str:\n    return self.client.auth(key)\n",
         "TOKEN_TTL_SECONDS = 3600\nSECRET_HEADER = 'X-Api-Key'\n",
+        "| `CuentaPortal` | `PortalAccount` (+ `webauthn_user_id` BinaryField(32), único, default callable `secrets.token_bytes(32)`) |",
+        "nonce = secrets.token_urlsafe(32)\nkey = hashlib.sha256(b'x').hexdigest()\n",
     ],
 )
 def test_content_without_candidate_literals_skips_laya(tmp_path, content: str) -> None:
@@ -211,6 +259,12 @@ def test_candidate_lines_reach_laya_alone(tmp_path, line: str) -> None:
     router.predict.assert_called_once()
     state = router.predict.call_args.args[0]
     assert line in state and "print('hola')" not in state
+
+
+def test_literal_passed_as_call_argument_still_reaches_laya(tmp_path) -> None:
+    line = "client = Client(credential='aB3dE5fG7hJ9kL1mN3pQ')"
+    _, router = run("detect_secrets", "Write", {"file_path": "a.py", "content": line}, tmp_path)
+    router.predict.assert_called_once()
 
 
 # ------------------------------------------------------------------ block_env_read
