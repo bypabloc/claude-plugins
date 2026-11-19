@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 import { BATCH_TEXT, blockedForUser, boundMessage, commitDir, commitHash, DEFAULT_BLOCK_REASONS, isCommit,
-  missingHashes, pendingText, HEADER, MAX_BLOCKS, missing, parseConfig,
+  missingHashes, pendingText, HEADER, MAX_BLOCKS, MAX_WAITS, missing, parseConfig,
   progressFields, stopDecision, tooLong, unboundMessage, WRITE_TEXT } from './handoff' // fmt: skip
 
 const PENDING = 'Status: in-progress\nPhase: implementation\nNext step: commit group 2\n'
@@ -58,10 +58,28 @@ test('Stop lets the turn end on done, a user block, external-wait or no next ste
   })
   expect(stopDecision('Status: in-progress\nPhase: external-wait\nNext step: CI', null, 'w', defaults)).toEqual({
     release: 'external-wait',
+    waits: 1,
   })
   expect(stopDecision('Status: in-progress', null, 'w', defaults)).toEqual({ release: 'no-step' })
   const decide = stopDecision('Status: blocked — no sé qué módulo usar\nNext step: x', null, 'w', defaults)
   expect('block' in decide && decide.block).toContain('la elección es tuya')
+})
+
+test('external-wait with PROGRESS.md unchanged asks once to recheck the wait, then lets it wait again', () => {
+  const WAIT = 'Status: in-progress\nPhase: external-wait\nNext step: api-record\n'
+  let previous: { text: string; blocks: number; waits?: number } | null = null
+  for (let i = 1; i < MAX_WAITS; i++) {
+    const d = stopDecision(WAIT, previous, 'w', defaults)
+    expect(d).toEqual({ release: 'external-wait', waits: i })
+    previous = { text: WAIT, blocks: 0, waits: i }
+  }
+  const recheck = stopDecision(WAIT, previous, 'w', defaults)
+  expect('block' in recheck && recheck.block).toContain('comprueba ahora')
+  expect(recheck).toHaveProperty('waits', 0)
+  previous = { text: WAIT, blocks: 0, waits: 0 }
+  expect(stopDecision(WAIT, previous, 'w', defaults)).toEqual({ release: 'external-wait', waits: 1 })
+  const changed = stopDecision(`${WAIT}Done: checked 14:10`, { text: WAIT, blocks: 0, waits: MAX_WAITS - 1 }, 'w', defaults)
+  expect(changed).toEqual({ release: 'external-wait', waits: 1 })
 })
 
 test('the bound message carries the files, the project context and the spec', () => {

@@ -41,7 +41,7 @@ Una sesión se vincula a un trabajo escribiendo su nombre en `tmp/handoff/.sessi
 | Evento | Comportamiento |
 | :--- | :--- |
 | Inicio, reanudación, `/clear`, compactación | Inyecta el trabajo vinculado (PROGRESS, DECISIONS, NOTES, la instrucción de su fase y su spec) o, sin vínculo, el id de la sesión y los trabajos activos |
-| Fin del turno (`Stop`) | Lo bloquea mientras haya `Next step` sin `Status: done` o un `blocked` válido. Deja parar en `external-wait` y tras 3 bloqueos seguidos sin cambios en `PROGRESS.md` |
+| Fin del turno (`Stop`) | Lo bloquea mientras haya `Next step` sin `Status: done` o un `blocked` válido. Deja parar en `external-wait` (la tercera parada seguida sin cambios en `PROGRESS.md` pide antes comprobar la espera) y tras 3 bloqueos seguidos sin cambios en `PROGRESS.md` |
 | `AskUserQuestion` con una spec en curso | Lo rechaza salvo con un `blocked` de una categoría del proyecto: el resto de las decisiones las toma el agente y las anota |
 | Escribir `PROGRESS.md` | Nombra en el acto las líneas de estado demasiado largas |
 | `git commit` en Bash | Si `PROGRESS.md` del trabajo vinculado no cita el hash, pide anotarlo en esa misma respuesta, junto con los de commits anteriores de la sesión que sigan faltando (con `-q` lee el hash en el repo del `cd` o `git -C`) |
@@ -49,7 +49,7 @@ Una sesión se vincula a un trabajo escribiendo su nombre en `tmp/handoff/.sessi
 | Compactación (`/compact` o el umbral automático) | Con un trabajo vinculado, no llama al modelo: conserva los mensajes recientes que caben en ~20k tokens, cortados en un punto seguro, y el handoff entra después. Sin trabajo, compacta como siempre |
 | Spinner y banda | `<Phase> · <Current> · ETA` mientras trabaja; sobre el prompt, estado, fase, ETA y `ctx <n>%`, con un botón `Hide` |
 
-Cada decisión queda en `tmp/handoff/.log/events.jsonl` (`inject`, `stop.block`, `stop.release`, `ask.deny`, `compact.kept`, `compact.fallback`, `commit.remind`, `stop.commits`).
+Cada decisión queda en `tmp/handoff/.log/events.jsonl` (`inject`, `stop.block`, `stop.release`, `stop.recheck`, `ask.deny`, `compact.kept`, `compact.fallback`, `commit.remind`, `stop.commits`).
 
 ## Configuración por proyecto (opcional)
 
@@ -102,6 +102,7 @@ claude --plugin-dir .         # probarlo en una sesión sin instalarlo
 
 ## Versiones
 
+* **0.3.1**: tras 3 paradas seguidas en `external-wait` sin cambios en `PROGRESS.md`, `Stop` bloquea una vez y pide comprobar que la espera sigue en pie (evento `stop.recheck`): una espera cuya corrida ya murió ya no deja la sesión parada indefinidamente.
 * **0.3.0**: `phases` en la configuración para reemplazar la instrucción de una fase; el mensaje inyectado incluye cómo escribir el handoff (herramienta de archivos, cuándo, breve y sin secretos); los tests de eventos pasan también en Linux y macOS.
 * **0.2.0**: los hashes que faltan en `PROGRESS.md` se recuerdan en cada commit, mensaje nuevo y fin de turno hasta que estén; con `git commit -q`, el hash sale del repo del `cd` o `git -C`.
 * **0.1.0**: recordatorio del hash en `PROGRESS.md` tras cada `git commit`; un lote es un solo trabajo que termina tras su última spec; con `Status: done` el cierre siempre borra el handoff (también con un `closing` propio).

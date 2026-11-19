@@ -1,7 +1,7 @@
 {
   "name": "session-handoff",
   "description": "Handoff de sesión en disco para sesiones largas y varios agentes: lo reinyecta al iniciar y compactar, no deja cerrar el turno con trabajo pendiente, compacta sin resumen del modelo y muestra el estado sobre el prompt.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "author": {
     "name": "Pablo Contreras",
     "email": "pacg1991@gmail.com",

@@ -268,19 +268,39 @@ export function longText(labels: string[]): string {
   )
 }
 
+/** What the last Stop left: the PROGRESS.md it saw, its blocks and its external-wait releases on that same text. */
+export type StopState = { text: string; blocks: number; waits?: number }
+
+/** Consecutive external-wait stops on an unchanged PROGRESS.md before the plugin asks to recheck the wait. */
+export const MAX_WAITS = 3
+
+export function recheckText(work: string, step: string): string {
+  return (
+    `[session-handoff] ${work} lleva ${MAX_WAITS} paradas en external-wait sin cambios en PROGRESS.md. Antes de ` +
+    'volver a parar, comprueba ahora que la espera sigue en pie: que la corrida siga viva (su PID o su candado), que ' +
+    'el check siga pendiente, que el aviso esperado no haya llegado ya. Si se resolvió, sigue con: ' +
+    `${step}. Si sigue, anota en PROGRESS.md qué comprobaste y a qué hora.`
+  )
+}
+
 /** What the Stop hook decides, given PROGRESS.md and how many times it already blocked on that same text. */
 export function stopDecision(
   progress: string,
-  previous: { text: string; blocks: number } | null,
+  previous: StopState | null,
   work: string,
   c: Config,
-): { release: string } | { block: string; blocks: number } {
+): { release: string; waits?: number } | { block: string; blocks: number; waits?: number } {
   const fields = progressFields(progress)
   const decide = fields.status === 'blocked' && !blockedForUser(fields, c)
   if (!decide) {
     if (fields.status === 'done' || fields.status === 'blocked') return { release: fields.status }
     if (!fields.next_step) return { release: 'no-step' }
-    if (fields.phase === 'external-wait') return { release: 'external-wait' }
+    if (fields.phase === 'external-wait') {
+      // A wait that outlives what it waited for (a run that died, a notice already sent) never ends on its own.
+      const waits = previous && previous.text === progress ? (previous.waits ?? 0) + 1 : 1
+      if (waits < MAX_WAITS) return { release: 'external-wait', waits }
+      return { block: recheckText(work, (fields.next_step ?? '').slice(0, 160)), blocks: 0, waits: 0 }
+    }
   }
   const blocks = previous && previous.text === progress ? previous.blocks + 1 : 1
   if (blocks > MAX_BLOCKS) return { release: 'cap' }

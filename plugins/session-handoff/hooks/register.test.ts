@@ -80,6 +80,17 @@ test('Stop blocks while the next step is pending and lets go once done', async (
   expect(files[`${ROOT}/tmp/handoff/.log/events.jsonl`]).toContain('"stop.release"')
 })
 
+test('a stale external-wait is released twice, then the third Stop asks to recheck the wait', async ($, on) => {
+  const files = bound({ [`${ROOT}/tmp/handoff/012-x/PROGRESS.md`]: 'Status: in-progress\nPhase: external-wait\nNext step: CI\n' })
+  world(on, files)
+  const stop = () => $.classic.Stop({ stop_hook_active: false, cwd: ROOT, session_id: SESSION })
+  expect((await stop()).block).toBeUndefined()
+  expect((await stop()).block).toBeUndefined()
+  expect((await stop()).block).toContain('comprueba ahora')
+  expect(files[`${ROOT}/tmp/handoff/.log/events.jsonl`]).toContain('"stop.recheck"')
+  expect((await stop()).block).toBeUndefined()
+})
+
 test('with a spec running, AskUserQuestion is denied unless a user block reason is set', async ($, on) => {
   const files = bound({ [`${ROOT}/docs/specs/012-x/README.md`]: '#' })
   world(on, files)
