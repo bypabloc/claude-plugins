@@ -16,6 +16,14 @@ test('reads the status lines, bulleted or bold, and splits the status reason', (
   expect(missing(progressFields(PENDING))).toEqual(['Done', 'Current', 'Remaining', 'ETA'])
 })
 
+test('a phase followed by a note is still that phase', () => {
+  expect(progressFields('Phase: external-wait (reintento commit ciclo 3, PID 2499229)').phase).toBe('external-wait')
+  expect(progressFields('Phase: Verification — batería 2').phase).toBe('verification')
+  expect(progressFields('Phase: external-waiting').phase).toBeUndefined()
+  const wait = 'Status: in-progress\nPhase: external-wait (commit en segundo plano)\nNext step: ciclo 4\n'
+  expect(stopDecision(wait, null, 'w', defaults)).toEqual({ release: 'external-wait', waits: 1 })
+})
+
 test('the config falls back field by field to the defaults', () => {
   expect(defaults.blockReasons).toEqual(DEFAULT_BLOCK_REASONS)
   expect(defaults.specsDir).toBe('docs/specs')

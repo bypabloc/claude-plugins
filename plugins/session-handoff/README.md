@@ -102,6 +102,7 @@ claude --plugin-dir .         # probarlo en una sesión sin instalarlo
 
 ## Versiones
 
+* **0.3.3**: la línea `Phase:` admite una nota después de la fase (`external-wait (commit en segundo plano)`); antes se descartaba y `Stop` bloqueaba hasta el tope en cada despertar.
 * **0.3.2**: una parada menos de 60 s después de un bloqueo cuenta para el tope de 3 aunque `PROGRESS.md` haya cambiado (un agente que esperaba una tarea en segundo plano tocaba el archivo en cada último aviso y quedaba en bucle); el primer aviso dice que, para esperar una tarea, un check o un aviso, se pone `Phase: external-wait`.
 * **0.3.1**: tras 3 paradas seguidas en `external-wait` sin cambios en `PROGRESS.md`, `Stop` bloquea una vez y pide comprobar que la espera sigue en pie (evento `stop.recheck`): una espera cuya corrida ya murió ya no deja la sesión parada indefinidamente.
 * **0.3.0**: `phases` en la configuración para reemplazar la instrucción de una fase; el mensaje inyectado incluye cómo escribir el handoff (herramienta de archivos, cuándo, breve y sin secretos); los tests de eventos pasan también en Linux y macOS.

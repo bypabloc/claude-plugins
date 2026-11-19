@@ -79,7 +79,8 @@ export function progressFields(text: string): Omit<WorkStatus, 'work'> {
     found.status = status[1]!.toLowerCase()
     if (status[2]) found.reason = status[2]
   }
-  const phase = found.phase?.toLowerCase()
+  // The phase may carry a note after it (`external-wait (commit en segundo plano)`): only the leading word counts.
+  const phase = /^[a-z-]+/i.exec(found.phase ?? '')?.[0]?.toLowerCase()
   if (phase && (PHASES as readonly string[]).includes(phase)) found.phase = phase
   else delete found.phase
   return found
