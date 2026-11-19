@@ -158,3 +158,42 @@ test('a hash left out survives an interruption: the next prompt and the Stop ask
   const after = await $.classic.UserPromptSubmit({ prompt: 'sigue', session_id: SESSION, cwd: ROOT })
   expect((after.additionalContext ?? []).join('\n')).not.toContain('b0c1d2e')
 })
+
+const BAND = {
+  plugin: 'session-handoff',
+  component: 'AbovePrompt',
+  props: { hasSurvey: false, isCollapsed: false, isWorking: false, maxRows: 20, bodyColumns: 120,
+    scroll: { offset: 0, bodyRows: 19 }, view: {} },
+} as const // fmt: skip
+
+test('a test run and a finished turn draw the metrics row above the status line', async ($, on) => {
+  const files = bound()
+  world(on, files)
+  let usd = 1.25
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200_000 }, rateLimits: [], cost: { usd } } }) as never)
+  const kept = new Map<string, unknown>()
+  on('store.get', (_, e) => ({ value: kept.get(e.key) }))
+  on('store.set', (_, e) => (kept.set(e.key, e.value), { value: undefined }))
+  on('store.keys', () => ({ value: [...kept.keys()] }))
+  on('store.delete', (_, e) => (kept.delete(e.key), { value: undefined }))
+  on('clock.now', () => ({ value: 5_000 }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  on('turn.complete', (_, e) => ({ text: e.answer }))
+  await $.turn.start({ text: 'sigue', turnId: 't1' })
+  await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: { command: 'bun test' },
+    tool_response: { stdout: '', stderr: ' 54 pass\n 0 fail\n' }, tool_use_id: 't4', session_id: SESSION }) // fmt: skip
+  usd = 2
+  const usage = { input_tokens: 1000, output_tokens: 500, cache_read_input_tokens: 8000, cache_creation_input_tokens: 500,
+    model: 'claude-opus-5-5' } // fmt: skip
+  await $.turn.complete({ answer: 'ok', durationMs: 90_000, isAborted: false, turnId: 't1', reason: 'answer', usage })
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ ...BAND, surface })
+    expect((await ui.find({ type: 'Text', text: /passed/ }))?.text).toBe('54 passed')
+    expect((await ui.find({ type: 'Text', text: /^last / }))?.text).toBe('last $0.75 · ⌀ $2.00')
+    expect((await ui.find({ type: 'Text', text: /turn/ }))?.text).toBe('1 turn · ↓ 500')
+    await ui.press({ key: 'compact' })
+    expect(await ui.find({ type: 'Text', text: /passed/ })).toBeUndefined()
+    await ui.press({ key: 'compact' })
+    await ui.unmount()
+  }
+})

@@ -29,11 +29,50 @@ export type HandoffConfig = {
   phases?: Record<string, string>
 }
 
+/** Counts of the last test run read from a Bash command's output. */
+export type TestRun = { passed: number; failed: number; at: number }
+
+/** Token counts summed over the session's turns, subagents included. */
+export type TokenTotals = { input: number; output: number; cacheRead: number; cacheWrite: number }
+
+/** A rate-limit window as the last response reported it. */
+export type LimitWindow = { kind: string; percentUsed: number; resetsAt?: string }
+
+/** What the metrics rows draw: the session's cost, tokens, time, tests and handoff health. */
+export type Meter = {
+  session: string
+  /** When the session began (`$.session.usage().startedAt`). */
+  startedAt: number
+  /** Main-loop turns that ended. */
+  turns: number
+  /** Wall-clock time of the main-loop turns, summed. */
+  agentMs: number
+  lastTurnMs: number | null
+  tokens: TokenTotals
+  /** The session's cost as `/cost` totals it: an estimate, not the bill. */
+  costUsd: number | null
+  hasUnknownPrice?: boolean
+  /** The cost when the running main-loop turn began, to price it at its end. */
+  costAtTurnStart: number | null
+  lastTurnUsd: number | null
+  limits: LimitWindow[]
+  tests: TestRun | null
+  /** Files written or edited (outside tmp/handoff) since the last test run. */
+  editsSinceTests: number
+  compactions: number
+  /** Turns the Stop hook held back, and the times its cap of 3 let one go. */
+  stopBlocks: number
+  stopCaps: number
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'session-handoff': {
       status: WorkStatus | null
       isHidden: boolean
+      /** The metrics rows collapsed to the status line alone. */
+      isCompact: boolean
+      meter: Meter | null
       contextPercent: number | null
       /** The PROGRESS.md the last Stop saw, its blocks and its external-wait releases on that same text. */
       lastStop: { text: string; blocks: number; waits?: number; at?: number } | null

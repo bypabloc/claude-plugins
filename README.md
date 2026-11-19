@@ -10,7 +10,7 @@ Aplica y refuerza el uso estricto de **español neutro latinoamericano estándar
 - **Repositorio:** [https://github.com/bypabloc/claude-plugin-spanish-latam](https://github.com/bypabloc/claude-plugin-spanish-latam)
 
 ### 2. `session-handoff`
-Handoff de sesión en disco (`tmp/handoff/<trabajo>/`) para **sesiones largas y trabajo con varios agentes**: lo reinyecta al iniciar, reanudar y compactar, no deja cerrar el turno mientras quede un siguiente paso, compacta sin pedirle un resumen al modelo y muestra el estado del trabajo sobre el prompt. Es un mod en TypeScript, sin dependencias externas, y funciona en cualquier proyecto; lo específico de cada uno va en un `.claude/session-handoff.json` opcional.
+Handoff de sesión en disco (`tmp/handoff/<trabajo>/`) para **sesiones largas y trabajo con varios agentes**: lo reinyecta al iniciar, reanudar y compactar, no deja cerrar el turno mientras quede un siguiente paso, compacta sin pedirle un resumen al modelo y muestra sobre el prompt el estado del trabajo y las métricas de la sesión (costo estimado, tokens, tiempo, caché, pruebas y límites). Es un mod en TypeScript, sin dependencias externas, y funciona en cualquier proyecto; lo específico de cada uno va en un `.claude/session-handoff.json` opcional.
 
 - **Repositorio:** [https://github.com/bypabloc/claude-plugin-session-handoff](https://github.com/bypabloc/claude-plugin-session-handoff)
 - **Instalar:** `claude plugin install session-handoff@bypabloc`

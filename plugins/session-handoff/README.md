@@ -47,9 +47,32 @@ Una sesión se vincula a un trabajo escribiendo su nombre en `tmp/handoff/.sessi
 | `git commit` en Bash | Si `PROGRESS.md` del trabajo vinculado no cita el hash, pide anotarlo en esa misma respuesta, junto con los de commits anteriores de la sesión que sigan faltando (con `-q` lee el hash en el repo del `cd` o `git -C`) |
 | Mensaje nuevo (`UserPromptSubmit`) y fin del turno (`Stop`) | Mientras falte un hash de la sesión en `PROGRESS.md`, lo recuerda: una interrupción (el usuario, un cron) no lo deja perder |
 | Compactación (`/compact` o el umbral automático) | Con un trabajo vinculado, no llama al modelo: conserva los mensajes recientes que caben en ~20k tokens, cortados en un punto seguro, y el handoff entra después. Sin trabajo, compacta como siempre |
-| Spinner y banda | `<Phase> · <Current> · ETA` mientras trabaja; sobre el prompt, estado, fase, ETA y `ctx <n>%`, con un botón `Hide` |
+| Spinner y banda | `<Phase> · <Current> · ETA` mientras trabaja; sobre el prompt, la fila de métricas entre divisores y, debajo, estado, fase, ETA y `ctx <n>%` (ámbar desde 70 %, rojo desde 85 %), con los botones `Less`/`More` y `Hide` |
 
 Cada decisión queda en `tmp/handoff/.log/events.jsonl`, con la versión del plugin en `v` (`inject`, `stop.block`, `stop.release`, `stop.recheck`, `ask.deny`, `compact.kept`, `compact.fallback`, `commit.remind`, `stop.commits`).
+
+## Métricas sobre el prompt
+
+```text
+────────────────────────────────────────────────────────────────────────────────────────────
+cost (est.)            tokens        agent time       cache reuse   tests              limits            handoff
+$22.86                 67.6M         1h 6m            91%           456 passed         5h 82%            1 hash due
+last $0.50 · ⌀ $1.20   19 turns · ↓ 1.5M  ⌀ 3m 30s / turn  60M read  after last change   7d 18% · resets 2h  2 compact · 6 held · 1 cap
+────────────────────────────────────────────────────────────────────────────────────────────
+● in-progress · implementation · ETA ~2 h · ctx 47%  Less  Hide
+```
+
+| Columna | De dónde sale |
+| :--- | :--- |
+| `cost (est.)` | El total de `/cost` (`session.measure`), el costo del último turno y el promedio por turno. Es la estimación local de Claude Code, no la factura; con suscripción, el uso dentro del plan no se cobra |
+| `tokens` | Entrada, salida y caché de cada turno (`turn.complete`), subagentes incluidos; turnos del loop principal y tokens generados (`↓`) |
+| `agent time` | Duración de los turnos del loop principal y su promedio |
+| `cache reuse` | Parte de la entrada que sirvió la caché de prompts; en ámbar bajo 50 % (una caché que se pierde encarece cada turno) |
+| `tests` | La última corrida de pruebas en Bash (bun, vitest, jest, pytest, playwright, mocha, cargo, `claude plugin test`): pasadas o falladas, y si hubo ediciones de archivos después (`3 edits since`, en ámbar) |
+| `limits` | Las ventanas de rate limit de la suscripción (5 h, 7 d) con su reinicio; ámbar desde 75 %, rojo desde 90 %. Sin suscripción, el burn rate en $/h sobre el tiempo de la sesión |
+| `handoff` | Solo con un trabajo vinculado: hashes que faltan en `PROGRESS.md`, compactaciones, turnos que `Stop` retuvo y veces que soltó por el tope (varias seguidas indican un agente en bucle) |
+
+`Less` deja solo la línea de estado; `Hide` oculta la banda. Los totales se guardan por sesión en el almacén del plugin, así que un `--resume` los conserva.
 
 ## Configuración por proyecto (opcional)
 
@@ -96,12 +119,13 @@ Con cada mensaje, el plugin recuerda cómo escribir el handoff: con la herramien
 
 ```bash
 claude plugin validate .
-claude plugin test .          # handoff, store, register (eventos), tail y status
+claude plugin test .          # handoff, store, register (eventos), tail, status y metrics
 claude --plugin-dir .         # probarlo en una sesión sin instalarlo
 ```
 
 ## Versiones
 
+* **0.4.0**: fila de métricas sobre la línea de estado, entre divisores: costo estimado (total, último turno y promedio), tokens y turnos, tiempo del agente, reuso de caché, última corrida de pruebas y si hubo cambios después, rate limits o burn rate, y salud del handoff (hashes pendientes, compactaciones, `Stop` retenidos y topes). `ctx` cambia de color al acercarse a la compactación; botones `Less`/`More` y `Hide`; los totales sobreviven a `--resume`.
 * **0.3.5**: cada línea de `events.jsonl` lleva `v`, la versión del plugin que la escribió: una sesión que no recargó el plugin se ve en la bitácora sin adivinar por su comportamiento.
 * **0.3.4**: al escribir `PROGRESS.md`, una línea `Phase:` que no empieza con una fase válida se nombra en el acto (sin fase válida, `Stop` no reconoce `external-wait`).
 * **0.3.3**: la línea `Phase:` admite una nota después de la fase (`external-wait (commit en segundo plano)`); antes se descartaba y `Stop` bloqueaba hasta el tope en cada despertar.
