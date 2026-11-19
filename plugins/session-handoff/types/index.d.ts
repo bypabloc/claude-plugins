@@ -34,6 +34,8 @@ declare module 'claude-code' {
       isHidden: boolean
       contextPercent: number | null
       lastStop: { text: string; blocks: number } | null
+      /** Hashes of the commits made in this session that PROGRESS.md does not name yet. */
+      pendingCommits: string[]
     }
   }
 }

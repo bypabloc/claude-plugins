@@ -30,6 +30,7 @@ function world(on: On, files: Record<string, string>): void {
       'rev-parse --show-toplevel': ROOT,
       'rev-parse --path-format=absolute --git-common-dir': `${ROOT}/.git`,
       'branch --show-current': 'feature/012-x',
+      'log -1 --format=%h': 'b0c1d2e',
     }
     const stdout = out[e.argv.slice(1).join(' ')]
     const code = stdout === undefined ? 1 : 0
@@ -40,6 +41,7 @@ function world(on: On, files: Record<string, string>): void {
   // What the engine answers beneath every plugin: nothing to add, and a tool that ran.
   on('classic.SessionStart', () => ({}))
   on('classic.Stop', () => ({}))
+  on('classic.UserPromptSubmit', () => ({}))
   on('classic.PostToolUse', () => ({}))
   on('tool.call', () => ({ result: { answers: {} } }) as never)
 }
@@ -102,4 +104,18 @@ test('a git commit in Bash asks for its hash in PROGRESS.md until it is there', 
   expect((await commit('[feature/012-x 70ff3be] feat: y')).block).toContain('70ff3be')
   files[`${ROOT}/tmp/handoff/012-x/PROGRESS.md`] = `${PENDING}Done: grupo 1 (70ff3be)\n`
   expect((await commit('[feature/012-x 70ff3be] feat: y')).block).toBeUndefined()
+})
+
+test('a hash left out survives an interruption: the next prompt and the Stop ask for it', async ($, on) => {
+  const files = bound()
+  world(on, files)
+  const quiet = await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: { command: 'cd /d/r && git commit -q -m x' },
+    tool_response: { stdout: '' }, tool_use_id: 't3', session_id: SESSION }) // fmt: skip
+  expect(quiet.block).toContain('b0c1d2e')
+  const prompt = await $.classic.UserPromptSubmit({ prompt: 'reporte', session_id: SESSION, cwd: ROOT })
+  expect((prompt.additionalContext ?? []).join('\n')).toContain('b0c1d2e')
+  expect((await $.classic.Stop({ stop_hook_active: false, cwd: ROOT, session_id: SESSION })).block).toContain('b0c1d2e')
+  files[`${ROOT}/tmp/handoff/012-x/PROGRESS.md`] = `${PENDING}Done: grupo 1 (b0c1d2e)\n`
+  const after = await $.classic.UserPromptSubmit({ prompt: 'sigue', session_id: SESSION, cwd: ROOT })
+  expect((after.additionalContext ?? []).join('\n')).not.toContain('b0c1d2e')
 })

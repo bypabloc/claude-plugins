@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
-import { BATCH_TEXT, blockedForUser, boundMessage, commitHash, commitText, DEFAULT_BLOCK_REASONS, isCommit, HEADER, MAX_BLOCKS, missing, parseConfig,
+import { BATCH_TEXT, blockedForUser, boundMessage, commitDir, commitHash, DEFAULT_BLOCK_REASONS, isCommit,
+  missingHashes, pendingText, HEADER, MAX_BLOCKS, missing, parseConfig,
   progressFields, stopDecision, tooLong, unboundMessage } from './handoff' // fmt: skip
 
 const PENDING = 'Status: in-progress\nPhase: implementation\nNext step: commit group 2\n'
@@ -101,10 +102,16 @@ test('a commit is detected in a compound command and its hash read from the outp
   expect(commitHash('')).toBeNull()
 })
 
-test('the commit reminder stays quiet once PROGRESS.md names the hash', () => {
-  expect(commitText('lote', 'Done: 001 (abc1234)', 'abc1234')).toBeNull()
-  expect(commitText('lote', 'Done: 001', '70ff3be')).toContain('70ff3be')
-  expect(commitText('lote', 'Done: 001', null)).toContain('git log -1')
+test('the reminder lists every hash PROGRESS.md lacks and stays quiet once all are there', () => {
+  expect(missingHashes(['abc1234', '70ff3be', '70ff3be', ''], 'Done: 001 (abc1234)')).toEqual(['70ff3be'])
+  expect(pendingText('lote', ['70ff3be', 'a233899'])).toContain('70ff3be, a233899')
+  expect(pendingText('lote', [])).toBeNull()
+})
+
+test('the commit runs where its git -C or cd points, Git Bash paths included', () => {
+  expect(commitDir('cd /d/Users/x/wt && git add -A && git commit -q -m y', 'D:/r')).toBe('D:/Users/x/wt')
+  expect(commitDir('git -C "../wt" commit -m y', 'D:/r')).toBe('D:/r/../wt')
+  expect(commitDir('git commit -m y', 'D:/r')).toBe('D:/r')
 })
 
 test('a batch ends only after its last spec, and done always deletes the handoff', () => {

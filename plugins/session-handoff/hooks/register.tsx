@@ -2,8 +2,8 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, SessionMessage } from 'claude-code'
 
 import type { WorkStatus } from '../types'
-import { askDeniedText, blockedForUser, boundMessage, commitHash, commitText, isCommit, longText,
-  progressFields, stopDecision, tooLong, unboundMessage } from './handoff' // fmt: skip
+import { askDeniedText, blockedForUser, boundMessage, commitDir, commitHash, isCommit, longText, missingHashes,
+  pendingText, progressFields, stopDecision, tooLong, unboundMessage } from './handoff' // fmt: skip
 import { bandText, keepsMessage, spinnerWord, STATUS_COLOR } from './status'
 import { activeWorks, boundOf, configOf, currentWork, handoffDir, type Io, logEvent, type Place, placeOf,
   progressOf, specOf, statusOf } from './store' // fmt: skip
@@ -25,6 +25,7 @@ const status = atom({ plugin: 'session-handoff', key: 'status' } as const, null)
 const isHidden = atom({ plugin: 'session-handoff', key: 'isHidden' } as const, false)
 const contextPercent = atom({ plugin: 'session-handoff', key: 'contextPercent' } as const, null)
 const lastStop = atom({ plugin: 'session-handoff', key: 'lastStop' } as const, null)
+const pendingCommits = atom({ plugin: 'session-handoff', key: 'pendingCommits' } as const, [] as string[])
 
 /** The engine's disk and git as the store's Io. */
 function ioOf($: EngineInterface): Io {
@@ -63,22 +64,32 @@ async function refresh($: EngineInterface): Promise<void> {
   }
 }
 
-/** After a `git commit` in Bash, asks for its hash in PROGRESS.md of the bound work, unless already there. */
+/** The bound work and the commits of this session its PROGRESS.md does not name yet (the state is pruned). */
+async function pending($: EngineInterface, session: string, add: string[] = []) {
+  const { io, place } = await here($)
+  const work = await currentWork(io, place, session)
+  if (!work) return null
+  const missing = missingHashes([...(await read($, pendingCommits)), ...add], await progressOf(io, place, work))
+  await update($, pendingCommits, () => missing)
+  return { io, place, work, missing }
+}
+
+/** After a `git commit` in Bash, asks for every hash PROGRESS.md of the bound work still lacks, this one included. */
 async function afterCommit<R extends { block?: string }>(
   $: EngineInterface,
-  e: { tool_input?: unknown; tool_response?: unknown; session_id: string },
+  e: { tool_input?: unknown; tool_response?: unknown; session_id: string; cwd?: string },
   result: R,
 ): Promise<R> {
   const command = (e.tool_input as { command?: unknown } | undefined)?.command
   if (result.block || typeof command !== 'string' || !isCommit(command)) return result
-  const { io, place } = await here($)
-  const work = await currentWork(io, place, e.session_id)
-  if (!work) return result
   const stdout = (e.tool_response as { stdout?: unknown } | undefined)?.stdout
-  const sha = commitHash(typeof stdout === 'string' ? stdout : '')
-  const text = commitText(work, await progressOf(io, place, work), sha)
-  if (!text) return result
-  await logEvent(io, place.store, { event: 'commit.remind', session: e.session_id, work })
+  const cwd = e.cwd || (await $.session.cwd())
+  const sha = commitHash(typeof stdout === 'string' ? stdout : '') ??
+    ((await ioOf($).git(commitDir(command, cwd), ['log', '-1', '--format=%h'])) || null)
+  const state = await pending($, e.session_id, sha ? [sha] : [])
+  const text = state && pendingText(state.work, state.missing)
+  if (!state || !text) return result
+  await logEvent(state.io, state.place.store, { event: 'commit.remind', session: e.session_id, work: state.work })
   return { ...result, block: text }
 }
 
@@ -106,6 +117,12 @@ export const register: Register = on => {
     const { io, place } = await here($, e.cwd)
     const work = await currentWork(io, place, e.session_id)
     if (!work) return result
+    const unnoted = e.stop_hook_active ? null : await pending($, e.session_id)
+    const reminder = unnoted && pendingText(unnoted.work, unnoted.missing)
+    if (reminder) {
+      await logEvent(io, place.store, { event: 'stop.commits', session: e.session_id, work })
+      return { ...result, block: reminder }
+    }
     const config = await configOf(io, place.root)
     const progress = await progressOf(io, place, work)
     const decision = stopDecision(progress, await read($, lastStop), work, config)
@@ -139,6 +156,7 @@ export const register: Register = on => {
     const path = typeof input?.file_path === 'string' ? input.file_path.replace(/\\/g, '/') : ''
     if (!['Write', 'Edit'].includes(e.tool_name) || !PROGRESS_PATH.test(path)) return result
     await refresh($)
+    await pending($, e.session_id)
     const text = await $.fs.read(path).then(t => t as string, () => '')
     const long = tooLong(progressFields(text))
     return long.length ? { ...result, block: longText(long) } : result
@@ -163,6 +181,14 @@ export const register: Register = on => {
     // Roles must alternate: an assistant-led tail follows the marker directly.
     const ack = kept[0]?.role === 'assistant' ? [] : [built('assistant', ACK)]
     return { messages: [built('user', MARKER), ...ack, ...kept] }
+  })
+
+  // An interruption (the user, a cron) must not make a commit's hash slip from PROGRESS.md.
+  on('classic.UserPromptSubmit', async ($, e, next) => {
+    const result = await next(e)
+    const state = await pending($, e.session_id)
+    const text = state && pendingText(state.work, state.missing)
+    return text ? { ...result, additionalContext: [...(result.additionalContext ?? []), text] } : result
   })
 
   on('session.start', async ($, e, next) => {

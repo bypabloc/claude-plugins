@@ -292,12 +292,30 @@ export function commitHash(stdout: string): string | null {
   return /^\[[^\]\s]+(?: \([^)]*\))? ([0-9a-f]{7,40})\]/m.exec(stdout)?.[1] ?? null
 }
 
-/** The reminder after a commit, or null when PROGRESS.md already names its hash. */
-export function commitText(work: string, progress: string, sha: string | null): string | null {
-  if (sha && progress.includes(sha)) return null
+/** Where the commit ran: the `git -C <dir>` or the `cd <dir> &&` before it, else the session's cwd. */
+export function commitDir(command: string, cwd: string): string {
+  const quoted = String.raw`(?:"([^"]+)"|'([^']+)'|([^\s&;|]+))`
+  const at = new RegExp(String.raw`git\s+-C\s+${quoted}\s+commit\b`).exec(command) ??
+    new RegExp(String.raw`(?:^|&&|;)\s*cd\s+${quoted}\s*&&`).exec(command)
+  const dir = at ? (at[1] ?? at[2] ?? at[3] ?? '') : ''
+  // Git Bash spells D:\x as /d/x.
+  const native = dir.replace(/^\/([a-z])\//i, (_, d: string) => `${d.toUpperCase()}:/`)
+  if (!native) return cwd
+  return /^([a-z]:)?[\\/]/i.test(native) ? native : `${cwd.replace(/[\\/]+$/, '')}/${native}`
+}
+
+/** The hashes still missing from PROGRESS.md, oldest first and without repeats. */
+export function missingHashes(hashes: string[], progress: string): string[] {
+  return [...new Set(hashes.filter(Boolean))].filter(h => !progress.includes(h))
+}
+
+/** The reminder for the commits PROGRESS.md does not name yet, or null when it names them all. */
+export function pendingText(work: string, hashes: string[]): string | null {
+  if (!hashes.length) return null
   return (
-    `[session-handoff] Commit hecho en ${work}: actualiza PROGRESS.md ahora, en esta misma respuesta: el hash ` +
-    `${sha ?? '(git log -1 --format=%h)'} en Done, y Current, Remaining, ETA y Next step con lo siguiente. Con un ` +
-    'Next step viejo, tras compactar se repite trabajo.'
+    `[session-handoff] PROGRESS.md de ${work} no tiene ${hashes.length === 1 ? 'el commit' : 'los commits'} ` +
+    `${hashes.join(', ')}: anótalos ahora, en esta misma respuesta, en Done, y pon Current, Remaining, ETA y Next ` +
+    'step al día. Este aviso vuelve en cada commit, mensaje y fin de turno hasta que estén. Con un Next step viejo, ' +
+    'tras compactar se repite trabajo.'
   )
 }
