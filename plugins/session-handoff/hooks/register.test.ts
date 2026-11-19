@@ -115,6 +115,17 @@ test('with a spec running, AskUserQuestion is denied unless a user block reason 
   expect((await $.tool.call(ask)).deny).toBeUndefined()
 })
 
+test('a PROGRESS.md written with a phase that is not one is named right away', async ($, on) => {
+  const path = `${ROOT}/tmp/handoff/012-x/PROGRESS.md`
+  const files = bound({ [path]: 'Status: in-progress\nPhase: api-record tras merge de dev\nNext step: y' })
+  world(on, files)
+  const write = () => $.classic.PostToolUse({ tool_name: 'Edit', tool_input: { file_path: path }, tool_response: {},
+    tool_use_id: 't1', session_id: SESSION }) // fmt: skip
+  expect((await write()).block).toContain('no es una fase')
+  files[path] = 'Status: in-progress\nPhase: external-wait (api-record)\nNext step: y'
+  expect((await write()).block).toBeUndefined()
+})
+
 test('a PROGRESS.md written with a long status line is named right away', async ($, on) => {
   const path = `${ROOT}/tmp/handoff/012-x/PROGRESS.md`
   world(on, bound({ [path]: `Status: in-progress\nCurrent: ${'x'.repeat(130)}\nNext step: y` }))

@@ -262,6 +262,16 @@ export function unboundMessage(
   return lines.join('\n')
 }
 
+/** The warning for a `Phase:` line that names no phase (Stop then never sees external-wait), or null. */
+export function badPhaseText(progress: string): string | null {
+  const value = /^[\s>*-]*\**Phase\**\s*:\**\s*(.+?)\s*$/im.exec(progress)?.[1]
+  if (!value || progressFields(progress).phase) return null
+  return (
+    `[session-handoff] \`Phase: ${value.slice(0, 60)}\` no es una fase: empieza la línea con ${PHASES.join(', ')} ` +
+    '(una nota puede ir después). Sin una fase válida, Stop no reconoce external-wait.'
+  )
+}
+
 export function longText(labels: string[]): string {
   return (
     `[session-handoff] Cada línea de estado es corta (máximo ${LINE_MAX} caracteres); el historial y el detalle van ` +

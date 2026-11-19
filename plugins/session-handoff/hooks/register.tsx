@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, SessionMessage } from 'claude-code'
 
 import type { WorkStatus } from '../types'
-import { askDeniedText, blockedForUser, boundMessage, commitDir, commitHash, isCommit, longText, missingHashes,
+import { askDeniedText, badPhaseText, blockedForUser, boundMessage, commitDir, commitHash, isCommit, longText, missingHashes,
   pendingText, progressFields, stopDecision, tooLong, unboundMessage } from './handoff' // fmt: skip
 import { bandText, keepsMessage, spinnerWord, STATUS_COLOR } from './status'
 import { activeWorks, boundOf, configOf, currentWork, handoffDir, type Io, logEvent, type Place, placeOf,
@@ -161,7 +161,8 @@ export const register: Register = on => {
     await pending($, e.session_id)
     const text = await $.fs.read(path).then(t => t as string, () => '')
     const long = tooLong(progressFields(text))
-    return long.length ? { ...result, block: longText(long) } : result
+    const notes = [long.length ? longText(long) : null, badPhaseText(text)].filter(Boolean).join('\n')
+    return notes ? { ...result, block: notes } : result
   })
 
   on('session.compact', async ($, e, next) => {
