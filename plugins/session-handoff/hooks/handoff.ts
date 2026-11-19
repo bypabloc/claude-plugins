@@ -269,7 +269,13 @@ export function longText(labels: string[]): string {
 }
 
 /** What the last Stop left: the PROGRESS.md it saw, its blocks and its external-wait releases on that same text. */
-export type StopState = { text: string; blocks: number; waits?: number }
+export type StopState = { text: string; blocks: number; waits?: number; at?: number }
+
+/**
+ * A stop this soon after a block did no real work: it counts toward the cap even if PROGRESS.md changed, or an agent
+ * that touches the file at each last warning (waiting on a background task) loops forever.
+ */
+export const QUICK_STOP_MS = 60_000
 
 /** Consecutive external-wait stops on an unchanged PROGRESS.md before the plugin asks to recheck the wait. */
 export const MAX_WAITS = 3
@@ -289,6 +295,7 @@ export function stopDecision(
   previous: StopState | null,
   work: string,
   c: Config,
+  now: number = Date.now(),
 ): { release: string; waits?: number } | { block: string; blocks: number; waits?: number } {
   const fields = progressFields(progress)
   const decide = fields.status === 'blocked' && !blockedForUser(fields, c)
@@ -302,13 +309,15 @@ export function stopDecision(
       return { block: recheckText(work, (fields.next_step ?? '').slice(0, 160)), blocks: 0, waits: 0 }
     }
   }
-  const blocks = previous && previous.text === progress ? previous.blocks + 1 : 1
+  const quick = previous?.at !== undefined && previous.blocks > 0 && now - previous.at < QUICK_STOP_MS
+  const blocks = previous && (previous.text === progress || quick) ? previous.blocks + 1 : 1
   if (blocks > MAX_BLOCKS) return { release: 'cap' }
   const step = (fields.next_step ?? '').slice(0, 160)
   const tail = `(Parada ${blocks} de ${MAX_BLOCKS} sin cambios en PROGRESS.md.)`
   const texts = [
     `[session-handoff] El trabajo ${work} no terminó. Sigue ahora con el siguiente paso: ${step}. Los avisos de ` +
-      `tokens no son un límite. ${tail}`,
+      'tokens no son un límite. Si lo que falta es esperar una tarea en segundo plano, un check o un aviso, pon ' +
+      `\`Phase: external-wait\` y para: su notificación te despierta. ${tail}`,
     `[session-handoff] Segunda parada sin avance en ${work}. Solo ${Object.keys(c.blockReasons).join(', ')} ` +
       `justifican \`Status: blocked — <categoría>: <motivo>\`; si no, sigue con: ${step}. ${tail}`,
     `[session-handoff] Último aviso para ${work}: la próxima parada sin cambios en PROGRESS.md se permitirá. Sigue ` +

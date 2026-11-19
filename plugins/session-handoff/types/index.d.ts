@@ -36,7 +36,7 @@ declare module 'claude-code' {
       isHidden: boolean
       contextPercent: number | null
       /** The PROGRESS.md the last Stop saw, its blocks and its external-wait releases on that same text. */
-      lastStop: { text: string; blocks: number; waits?: number } | null
+      lastStop: { text: string; blocks: number; waits?: number; at?: number } | null
       /** Hashes of the commits made in this session that PROGRESS.md does not name yet. */
       pendingCommits: string[]
     }

@@ -125,13 +125,14 @@ export const register: Register = on => {
     }
     const config = await configOf(io, place.root)
     const progress = await progressOf(io, place, work)
-    const decision = stopDecision(progress, await read($, lastStop), work, config)
+    const now = Date.now()
+    const decision = stopDecision(progress, await read($, lastStop), work, config, now)
     if ('release' in decision) {
       await update($, lastStop, () => (decision.waits ? { text: progress, blocks: 0, waits: decision.waits } : null))
       await logEvent(io, place.store, { event: 'stop.release', session: e.session_id, reason: decision.release })
       return result
     }
-    await update($, lastStop, () => ({ text: progress, blocks: decision.blocks, waits: decision.waits }))
+    await update($, lastStop, () => ({ text: progress, blocks: decision.blocks, waits: decision.waits, at: now }))
     const event = decision.waits === 0 ? 'stop.recheck' : 'stop.block'
     await logEvent(io, place.store, { event, session: e.session_id, blocks: decision.blocks, work })
     return { ...result, block: decision.block }

@@ -80,6 +80,19 @@ test('Stop blocks while the next step is pending and lets go once done', async (
   expect(files[`${ROOT}/tmp/handoff/.log/events.jsonl`]).toContain('"stop.release"')
 })
 
+test('touching PROGRESS.md between quick stops does not reset the cap', async ($, on) => {
+  const path = `${ROOT}/tmp/handoff/012-x/PROGRESS.md`
+  const files = bound()
+  world(on, files)
+  const stop = () => $.classic.Stop({ stop_hook_active: true, cwd: ROOT, session_id: SESSION })
+  for (let i = 1; i <= 3; i++) {
+    expect((await stop()).block).toContain('012-x')
+    files[path] = `${PENDING}Current: still waiting ${i}\n`
+  }
+  expect((await stop()).block).toBeUndefined()
+  expect(files[`${ROOT}/tmp/handoff/.log/events.jsonl`]).toContain('"reason":"cap"')
+})
+
 test('a stale external-wait is released twice, then the third Stop asks to recheck the wait', async ($, on) => {
   const files = bound({ [`${ROOT}/tmp/handoff/012-x/PROGRESS.md`]: 'Status: in-progress\nPhase: external-wait\nNext step: CI\n' })
   world(on, files)

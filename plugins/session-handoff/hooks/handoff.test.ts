@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 import { BATCH_TEXT, blockedForUser, boundMessage, commitDir, commitHash, DEFAULT_BLOCK_REASONS, isCommit,
-  missingHashes, pendingText, HEADER, MAX_BLOCKS, MAX_WAITS, missing, parseConfig,
+  missingHashes, pendingText, HEADER, MAX_BLOCKS, MAX_WAITS, QUICK_STOP_MS, missing, parseConfig,
   progressFields, stopDecision, tooLong, unboundMessage, WRITE_TEXT } from './handoff' // fmt: skip
 
 const PENDING = 'Status: in-progress\nPhase: implementation\nNext step: commit group 2\n'
@@ -63,6 +63,23 @@ test('Stop lets the turn end on done, a user block, external-wait or no next ste
   expect(stopDecision('Status: in-progress', null, 'w', defaults)).toEqual({ release: 'no-step' })
   const decide = stopDecision('Status: blocked — no sé qué módulo usar\nNext step: x', null, 'w', defaults)
   expect('block' in decide && decide.block).toContain('la elección es tuya')
+})
+
+test('a quick stop after a block counts toward the cap even if PROGRESS.md was touched', () => {
+  const t0 = 1_000_000
+  let previous: { text: string; blocks: number; at?: number } | null = null
+  let text = PENDING
+  for (let i = 1; i <= MAX_BLOCKS; i++) {
+    const d = stopDecision(text, previous, 'w', defaults, t0 + i * 12_000)
+    expect('block' in d && d.blocks).toBe(i)
+    previous = { text, blocks: i, at: t0 + i * 12_000 }
+    text = `${text}Current: touched ${i}\n`
+  }
+  expect(stopDecision(text, previous, 'w', defaults, t0 + 50_000)).toEqual({ release: 'cap' })
+  const later = stopDecision(text, previous, 'w', defaults, t0 + 36_000 + QUICK_STOP_MS + 1)
+  expect(later).toHaveProperty('blocks', 1)
+  const first = stopDecision(PENDING, null, 'w', defaults)
+  expect('block' in first && first.block).toContain('external-wait')
 })
 
 test('external-wait with PROGRESS.md unchanged asks once to recheck the wait, then lets it wait again', () => {
