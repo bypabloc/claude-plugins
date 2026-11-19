@@ -5,7 +5,10 @@
 
 import type { HandoffConfig, WorkStatus } from '../types'
 
-export const FILES = ['PROGRESS.md', 'DECISIONS.md', 'NOTES.md'] as const
+/** The plugin version; equal to `.claude-plugin/plugin.json` (checked on every release). Each log line carries it. */
+export const VERSION = '0.3.5'
+
+export const FILES =['PROGRESS.md', 'DECISIONS.md', 'NOTES.md'] as const
 export const PHASES = ['implementation', 'verification', 'integration', 'external-wait', 'closing'] as const
 export const LINE_MAX = 120
 export const MAX_BLOCKS = 3

@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { parseConfig } from './handoff'
+import { parseConfig, VERSION } from './handoff'
 import { activeWorks, boundOf, configOf, currentWork, type Io, logEvent, placeOf, specOf, statusOf } from './store'
 
 /** An in-memory disk: paths to texts; a folder exists while some file is under it. */
@@ -81,5 +81,8 @@ test('the log appends one JSON line per event and never throws', async () => {
   await logEvent(io, 'D:/r', { event: 'b' })
   const lines = io.files['D:/r/tmp/handoff/.log/events.jsonl']!.trim().split('\n').map(l => JSON.parse(l))
   expect(lines.map(l => l.event)).toEqual(['a', 'b'])
+  // Each line names the plugin version that wrote it: a session that was not reloaded shows up at once.
+  expect(lines.map(l => l.v)).toEqual([VERSION, VERSION])
+  expect(VERSION).toMatch(/^\d+\.\d+\.\d+$/)
   await logEvent({ ...io, write: async () => Promise.reject(new Error('disk')) }, 'D:/r', { event: 'c' })
 })

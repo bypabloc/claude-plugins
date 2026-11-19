@@ -49,7 +49,7 @@ Una sesión se vincula a un trabajo escribiendo su nombre en `tmp/handoff/.sessi
 | Compactación (`/compact` o el umbral automático) | Con un trabajo vinculado, no llama al modelo: conserva los mensajes recientes que caben en ~20k tokens, cortados en un punto seguro, y el handoff entra después. Sin trabajo, compacta como siempre |
 | Spinner y banda | `<Phase> · <Current> · ETA` mientras trabaja; sobre el prompt, estado, fase, ETA y `ctx <n>%`, con un botón `Hide` |
 
-Cada decisión queda en `tmp/handoff/.log/events.jsonl` (`inject`, `stop.block`, `stop.release`, `stop.recheck`, `ask.deny`, `compact.kept`, `compact.fallback`, `commit.remind`, `stop.commits`).
+Cada decisión queda en `tmp/handoff/.log/events.jsonl`, con la versión del plugin en `v` (`inject`, `stop.block`, `stop.release`, `stop.recheck`, `ask.deny`, `compact.kept`, `compact.fallback`, `commit.remind`, `stop.commits`).
 
 ## Configuración por proyecto (opcional)
 
@@ -102,6 +102,7 @@ claude --plugin-dir .         # probarlo en una sesión sin instalarlo
 
 ## Versiones
 
+* **0.3.5**: cada línea de `events.jsonl` lleva `v`, la versión del plugin que la escribió: una sesión que no recargó el plugin se ve en la bitácora sin adivinar por su comportamiento.
 * **0.3.4**: al escribir `PROGRESS.md`, una línea `Phase:` que no empieza con una fase válida se nombra en el acto (sin fase válida, `Stop` no reconoce `external-wait`).
 * **0.3.3**: la línea `Phase:` admite una nota después de la fase (`external-wait (commit en segundo plano)`); antes se descartaba y `Stop` bloqueaba hasta el tope en cada despertar.
 * **0.3.2**: una parada menos de 60 s después de un bloqueo cuenta para el tope de 3 aunque `PROGRESS.md` haya cambiado (un agente que esperaba una tarea en segundo plano tocaba el archivo en cada último aviso y quedaba en bucle); el primer aviso dice que, para esperar una tarea, un check o un aviso, se pone `Phase: external-wait`.

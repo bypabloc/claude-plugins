@@ -4,7 +4,7 @@
  */
 
 import type { WorkStatus } from '../types'
-import { type Bound, type Config, FILES, parseConfig, progressFields } from './handoff'
+import { type Bound, type Config, FILES, parseConfig, progressFields, VERSION } from './handoff'
 
 /** What the store needs from the engine: `$.fs` and `$.process` in a session, a map in a test. */
 export type Io = {
@@ -101,7 +101,7 @@ export async function logEvent(io: Io, store: string, event: Record<string, unkn
   try {
     const path = `${handoffDir(store)}/.log/events.jsonl`
     const before = (await io.read(path)) ?? ''
-    const line = `${JSON.stringify({ ts: new Date().toISOString().slice(0, 19) + 'Z', ...event })}\n`
+    const line = `${JSON.stringify({ ts: new Date().toISOString().slice(0, 19) + 'Z', v: VERSION, ...event })}\n`
     const kept = before.length > 512_000 ? before.slice(before.indexOf('\n', before.length - 256_000) + 1) : before
     await io.write(path, kept + line)
   } catch {
