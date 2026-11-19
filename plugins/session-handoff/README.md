@@ -1,0 +1,99 @@
+# session-handoff
+
+Plugin de Claude Code para **sesiones largas y trabajo con varios agentes**. Guarda el estado de cada trabajo en disco (`tmp/handoff/<trabajo>/`), lo vuelve a inyectar al iniciar, reanudar y compactar, no deja cerrar el turno mientras quede un siguiente paso y compacta sin pedirle un resumen al modelo. El estado del trabajo se ve en el spinner y en una banda sobre el prompt.
+
+Es un mod de Claude Code escrito en TypeScript: **no necesita Python, Node ni nada instalado**, funciona igual en Windows, macOS y Linux, y en cualquier proyecto con git (sin git también, tomando la carpeta actual como raíz). Nació en dos proyectos propios (klinikae y content-studio) y se separó de ellos para usarlo en cualquiera.
+
+## Instalación
+
+```bash
+claude plugin marketplace add bypabloc/claude-plugins
+claude plugin install session-handoff@bypabloc
+```
+
+Requiere Claude Code 2.1.287 o posterior. Para un solo proyecto, `--scope project`. Comprobar: `claude plugin list`.
+
+## Cómo se usa
+
+Un trabajo es una carpeta en `tmp/handoff/<trabajo>/` del **checkout principal** (también desde un worktree: todos comparten la misma) con tres archivos que escribe el agente:
+
+| Archivo | Qué guarda |
+| :--- | :--- |
+| `PROGRESS.md` | Líneas de estado arriba y, debajo, objetivo, lo hecho (con hash) y lo pendiente |
+| `DECISIONS.md` | Una decisión por línea, con su motivo |
+| `NOTES.md` | Hallazgos, trampas, rutas y comandos que costó encontrar |
+
+Las líneas de estado de `PROGRESS.md`, una por línea y de 120 caracteres como máximo:
+
+```text
+Status: in-progress | done | blocked — <categoría>: <motivo>
+Phase: implementation | verification | integration | external-wait | closing
+Done: …   Current: …   Remaining: …   ETA: ~2 h
+Next step: …
+```
+
+Una sesión se vincula a un trabajo escribiendo su nombre en `tmp/handoff/.sessions/<session_id>` (el plugin le dice su id al iniciar), o sola si la rama lleva el mismo número que el trabajo (`feature/012-x` ↔ `tmp/handoff/012-x/`). Agrega `tmp/` a tu `.gitignore`.
+
+## Qué hace
+
+| Evento | Comportamiento |
+| :--- | :--- |
+| Inicio, reanudación, `/clear`, compactación | Inyecta el trabajo vinculado (PROGRESS, DECISIONS, NOTES, la instrucción de su fase y su spec) o, sin vínculo, el id de la sesión y los trabajos activos |
+| Fin del turno (`Stop`) | Lo bloquea mientras haya `Next step` sin `Status: done` o un `blocked` válido. Deja parar en `external-wait` y tras 3 bloqueos seguidos sin cambios en `PROGRESS.md` |
+| `AskUserQuestion` con una spec en curso | Lo rechaza salvo con un `blocked` de una categoría del proyecto: el resto de las decisiones las toma el agente y las anota |
+| Escribir `PROGRESS.md` | Nombra en el acto las líneas de estado demasiado largas |
+| Compactación (`/compact` o el umbral automático) | Con un trabajo vinculado, no llama al modelo: conserva los mensajes recientes que caben en ~20k tokens, cortados en un punto seguro, y el handoff entra después. Sin trabajo, compacta como siempre |
+| Spinner y banda | `<Phase> · <Current> · ETA` mientras trabaja; sobre el prompt, estado, fase, ETA y `ctx <n>%`, con un botón `Hide` |
+
+Cada decisión queda en `tmp/handoff/.log/events.jsonl` (`inject`, `stop.block`, `stop.release`, `ask.deny`, `compact.kept`, `compact.fallback`).
+
+## Configuración por proyecto (opcional)
+
+`.claude/session-handoff.json` en la raíz del proyecto. Todo es opcional; sin el archivo, el plugin usa los valores por defecto.
+
+```json
+{
+  "blockReasons": {
+    "user-data": "borrar o cambiar datos existentes del usuario",
+    "cost": "gastar dinero",
+    "credentials": "un acceso que solo tiene el usuario",
+    "user-stop": "el usuario pidió parar",
+    "taste": "elegir entre opciones que solo el usuario puede juzgar"
+  },
+  "context": ["Turno de la GPU: un modelo a la vez; usa `turno-gpu run`."],
+  "specsDir": "docs/specs",
+  "decisionsDir": "docs/process/WARNING",
+  "pendingDir": "docs/process/PENDING",
+  "closing": "Status es done: confirma el merge y cierra el worktree con `devtools worktree close`."
+}
+```
+
+| Campo | Por defecto | Qué cambia |
+| :--- | :--- | :--- |
+| `blockReasons` | `user-data`, `cost`, `credentials`, `user-stop` | Las únicas categorías de `blocked` que dejan parar o preguntar |
+| `context` | ninguna | Líneas que se inyectan con cada mensaje (un recurso compartido, un comando del proyecto) |
+| `specsDir` | `docs/specs` | Dónde busca la spec del trabajo (`<NN>-…/`, también dentro de un lote) |
+| `decisionsDir` / `pendingDir` | `DECISIONS.md` / `NOTES.md` del handoff | Dónde pide anotar las decisiones y lo diferido |
+| `closing` | texto genérico | La instrucción de cierre con `Status: done` |
+
+## Límites
+
+* Solo Claude Code: usa la API de mods (`hooks/register.tsx`). Codex o Antigravity necesitan su propio hook de handoff.
+* El tamaño del tramo que se conserva se estima en caracteres (~4 por token). Lo que no esté en el handoff ni en ese tramo se pierde: mantén `PROGRESS.md` al día.
+* Con `--resume`, los resultados de herramientas pueden volver a traer mensajes previos a la compactación.
+
+## Desarrollo
+
+```bash
+claude plugin validate .
+claude plugin test .          # handoff, store, register (eventos), tail y status
+claude --plugin-dir .         # probarlo en una sesión sin instalarlo
+```
+
+## Versiones
+
+* **0.0.1**: primera versión: handoff en disco, Stop, AskUserQuestion, aviso de líneas largas, compactación sin resumen, banda y spinner, configuración por proyecto.
+
+## Licencia
+
+MIT. Autor: Pablo Contreras ([@bypabloc](https://github.com/bypabloc)).
