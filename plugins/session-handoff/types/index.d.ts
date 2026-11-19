@@ -25,6 +25,8 @@ export type HandoffConfig = {
   pendingDir?: string
   /** Replaces the closing instruction shown once `Status: done`. */
   closing?: string
+  /** Phase → text that replaces the plugin's instruction for that phase (`implementation`, `verification`, …). */
+  phases?: Record<string, string>
 }
 
 declare module 'claude-code' {

@@ -30,7 +30,7 @@ export const DEFAULT_BLOCK_REASONS: Record<string, string> = {
 }
 
 /** The resolved config: the project's `.claude/session-handoff.json` over the defaults. */
-export type Config = Required<Pick<HandoffConfig, 'blockReasons' | 'context' | 'specsDir'>> &
+export type Config = Required<Pick<HandoffConfig, 'blockReasons' | 'context' | 'specsDir' | 'phases'>> &
   Pick<HandoffConfig, 'decisionsDir' | 'pendingDir' | 'closing'>
 
 /** Reads the project config; a missing file, bad JSON or a field of the wrong type falls back to the default. */
@@ -48,6 +48,12 @@ export function parseConfig(text: string | null): Config {
     reasons && typeof reasons === 'object' && !Array.isArray(reasons) && Object.keys(reasons).length > 0 &&
     Object.values(reasons).every(v => typeof v === 'string')
   const context = Array.isArray(raw.context) ? raw.context.filter((l): l is string => typeof l === 'string') : []
+  const phases: Record<string, string> = {}
+  if (raw.phases && typeof raw.phases === 'object' && !Array.isArray(raw.phases))
+    for (const [k, v] of Object.entries(raw.phases)) {
+      const text = str(v)
+      if (text && (PHASES as readonly string[]).includes(k)) phases[k] = text
+    }
   return {
     blockReasons: isReasons ? (reasons as Record<string, string>) : DEFAULT_BLOCK_REASONS,
     context,
@@ -55,6 +61,7 @@ export function parseConfig(text: string | null): Config {
     decisionsDir: str(raw.decisionsDir),
     pendingDir: str(raw.pendingDir),
     closing: str(raw.closing),
+    phases,
   }
 }
 
@@ -115,6 +122,13 @@ export function continueText(c: Config): string {
     BATCH_TEXT
   )
 }
+
+/** How the handoff files are written: what keeps them readable after every compaction. */
+export const WRITE_TEXT =
+  'Escribe el handoff con la herramienta de archivos (Write o Edit), nunca con echo, cat o tee desde la shell. ' +
+  'Actualízalo al empezar o retomar, tras cada commit y cada decisión, y antes de una corrida larga. Cada archivo ' +
+  'es breve (idealmente menos de 60 líneas): estado actual, no bitácora; enlaza la spec en vez de copiarla. Nunca ' +
+  'guardes secretos, valores de archivos de entorno ni datos personales.'
 
 /** A work that groups several specs (a batch) keeps one handoff and ends only after the last one. */
 export const BATCH_TEXT =
@@ -202,7 +216,8 @@ export function boundMessage(b: Bound, c: Config): string {
     )
   } else {
     lines.push(continueText(c))
-    if (fields.phase) lines.push(PHASE_TEXT[fields.phase as (typeof PHASES)[number]])
+    if (fields.phase) lines.push(c.phases[fields.phase] ?? PHASE_TEXT[fields.phase as (typeof PHASES)[number]])
+    lines.push(WRITE_TEXT)
   }
   lines.push(...c.context)
   const gaps = missing(fields)
@@ -234,6 +249,7 @@ export function unboundMessage(
   const lines = [
     `[session-handoff] Esta sesión (${session}) no tiene trabajo vinculado. Para un trabajo de más de un turno, ` +
       `crea ${base}/<trabajo>/ (PROGRESS.md, DECISIONS.md, NOTES.md) y escribe su nombre en ${base}/.sessions/${session}.`,
+    WRITE_TEXT,
     BATCH_TEXT,
     ...c.context,
   ]

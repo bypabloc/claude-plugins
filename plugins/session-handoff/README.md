@@ -68,7 +68,10 @@ Cada decisión queda en `tmp/handoff/.log/events.jsonl` (`inject`, `stop.block`,
   "specsDir": "docs/specs",
   "decisionsDir": "docs/process/WARNING",
   "pendingDir": "docs/process/PENDING",
-  "closing": "Status es done: confirma el merge y cierra el worktree con `devtools worktree close`."
+  "closing": "Status es done: confirma el merge y cierra el worktree con `devtools worktree close`.",
+  "phases": {
+    "verification": "Fase verification: corre la batería de 03-verificacion-final.md de la spec."
+  }
 }
 ```
 
@@ -79,6 +82,9 @@ Cada decisión queda en `tmp/handoff/.log/events.jsonl` (`inject`, `stop.block`,
 | `specsDir` | `docs/specs` | Dónde busca la spec del trabajo (`<NN>-…/`, también dentro de un lote) |
 | `decisionsDir` / `pendingDir` | `DECISIONS.md` / `NOTES.md` del handoff | Dónde pide anotar las decisiones y lo diferido |
 | `closing` | texto genérico | La instrucción de cierre con `Status: done` |
+| `phases` | texto genérico por fase | Reemplaza la instrucción de una fase (`implementation`, `verification`, `integration`, `external-wait`, `closing`) |
+
+Con cada mensaje, el plugin recuerda cómo escribir el handoff: con la herramienta de archivos (no con `echo` ni `cat`), al empezar, tras cada commit o decisión y antes de una corrida larga, breve (menos de 60 líneas por archivo), con la spec enlazada y sin secretos ni datos personales.
 
 ## Límites
 
@@ -96,6 +102,7 @@ claude --plugin-dir .         # probarlo en una sesión sin instalarlo
 
 ## Versiones
 
+* **0.3.0**: `phases` en la configuración para reemplazar la instrucción de una fase; el mensaje inyectado incluye cómo escribir el handoff (herramienta de archivos, cuándo, breve y sin secretos); los tests de eventos pasan también en Linux y macOS.
 * **0.2.0**: los hashes que faltan en `PROGRESS.md` se recuerdan en cada commit, mensaje nuevo y fin de turno hasta que estén; con `git commit -q`, el hash sale del repo del `cd` o `git -C`.
 * **0.1.0**: recordatorio del hash en `PROGRESS.md` tras cada `git commit`; un lote es un solo trabajo que termina tras su última spec; con `Status: done` el cierre siempre borra el handoff (también con un `closing` propio).
 * **0.0.1**: primera versión: handoff en disco, Stop, AskUserQuestion, aviso de líneas largas, compactación sin resumen, banda y spinner, configuración por proyecto.

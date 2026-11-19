@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import { BATCH_TEXT, blockedForUser, boundMessage, commitDir, commitHash, DEFAULT_BLOCK_REASONS, isCommit,
   missingHashes, pendingText, HEADER, MAX_BLOCKS, missing, parseConfig,
-  progressFields, stopDecision, tooLong, unboundMessage } from './handoff' // fmt: skip
+  progressFields, stopDecision, tooLong, unboundMessage, WRITE_TEXT } from './handoff' // fmt: skip
 
 const PENDING = 'Status: in-progress\nPhase: implementation\nNext step: commit group 2\n'
 const defaults = parseConfig(null)
@@ -119,4 +119,15 @@ test('a batch ends only after its last spec, and done always deletes the handoff
   expect(boundMessage({ ...b, files: { 'PROGRESS.md': PENDING } }, defaults)).toContain(BATCH_TEXT)
   const done = boundMessage({ ...b, files: { 'PROGRESS.md': 'Status: done' } }, parseConfig('{"closing": "Cierra."}'))
   expect(done).toContain('Cierra. Después borra R/tmp/handoff/lote/')
+})
+
+test('a project phase text replaces the default one, and the writing rules ride along', () => {
+  const c = parseConfig('{"phases": {"verification": "Corre 03-verificacion-final.md", "nope": "x", "closing": 3}}')
+  expect(c.phases).toEqual({ verification: 'Corre 03-verificacion-final.md' })
+  expect(defaults.phases).toEqual({})
+  const b = { work: 'w', folder: 'tmp/handoff/w', branch: 'b', source: 'startup', spec: null, files: {} }
+  const text = boundMessage({ ...b, files: { 'PROGRESS.md': 'Status: in-progress\nPhase: verification\nNext step: x' } }, c)
+  expect(text).toContain('Corre 03-verificacion-final.md')
+  expect(text).toContain(WRITE_TEXT)
+  expect(unboundMessage('s', 'tmp/handoff', 'startup', [], defaults)).toContain(WRITE_TEXT)
 })

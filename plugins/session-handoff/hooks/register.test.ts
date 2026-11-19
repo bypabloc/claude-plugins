@@ -7,8 +7,12 @@ const PENDING = 'Status: in-progress\nPhase: implementation\nNext step: commit g
 
 /** Answers the engine's disk, git and session from memory, beneath the plugin. */
 function world(on: On, files: Record<string, string>): void {
-  // The engine hands the paths over as the OS writes them (backslashes on Windows).
-  const at = (path: string): string => path.replace(/\\/g, '/')
+  // The engine hands the paths over as the OS writes them: backslashes on Windows, and on Linux or macOS
+  // `D:/r` is relative, so it arrives resolved against the cwd (`/cwd/D:/r/...`).
+  const at = (path: string): string => {
+    const slashed = path.replace(/\\/g, '/')
+    return slashed.slice(Math.max(0, slashed.indexOf(ROOT)))
+  }
   on('fs.read', (_, e) => {
     const text = files[at(e.path)]
     if (text === undefined) throw new Error(`ENOENT ${e.path}`)
