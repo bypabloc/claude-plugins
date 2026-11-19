@@ -2,8 +2,8 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, SessionMessage } from 'claude-code'
 
 import type { WorkStatus } from '../types'
-import { askDeniedText, blockedForUser, boundMessage, longText, progressFields, stopDecision, tooLong,
-  unboundMessage } from './handoff' // fmt: skip
+import { askDeniedText, blockedForUser, boundMessage, commitHash, commitText, isCommit, longText,
+  progressFields, stopDecision, tooLong, unboundMessage } from './handoff' // fmt: skip
 import { bandText, keepsMessage, spinnerWord, STATUS_COLOR } from './status'
 import { activeWorks, boundOf, configOf, currentWork, handoffDir, type Io, logEvent, type Place, placeOf,
   progressOf, specOf, statusOf } from './store' // fmt: skip
@@ -63,6 +63,25 @@ async function refresh($: EngineInterface): Promise<void> {
   }
 }
 
+/** After a `git commit` in Bash, asks for its hash in PROGRESS.md of the bound work, unless already there. */
+async function afterCommit<R extends { block?: string }>(
+  $: EngineInterface,
+  e: { tool_input?: unknown; tool_response?: unknown; session_id: string },
+  result: R,
+): Promise<R> {
+  const command = (e.tool_input as { command?: unknown } | undefined)?.command
+  if (result.block || typeof command !== 'string' || !isCommit(command)) return result
+  const { io, place } = await here($)
+  const work = await currentWork(io, place, e.session_id)
+  if (!work) return result
+  const stdout = (e.tool_response as { stdout?: unknown } | undefined)?.stdout
+  const sha = commitHash(typeof stdout === 'string' ? stdout : '')
+  const text = commitText(work, await progressOf(io, place, work), sha)
+  if (!text) return result
+  await logEvent(io, place.store, { event: 'commit.remind', session: e.session_id, work })
+  return { ...result, block: text }
+}
+
 const built = (role: SessionMessage['role'], text: string): SessionMessage => ({ role, text, toolUses: [] })
 
 /**
@@ -112,9 +131,10 @@ export const register: Register = on => {
     return { deny: askDeniedText(config) }
   })
 
-  // A status line written too long is named right away, not at the next reinjection.
+  // A status line written too long is named right away, not at the next reinjection; a commit asks for its hash.
   on('classic.PostToolUse', async ($, e, next) => {
     const result = await next(e)
+    if (e.tool_name === 'Bash') return afterCommit($, e, result)
     const input = e.tool_input as { file_path?: unknown } | undefined
     const path = typeof input?.file_path === 'string' ? input.file_path.replace(/\\/g, '/') : ''
     if (!['Write', 'Edit'].includes(e.tool_name) || !PROGRESS_PATH.test(path)) return result

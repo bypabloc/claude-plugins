@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { blockedForUser, boundMessage, DEFAULT_BLOCK_REASONS, HEADER, MAX_BLOCKS, missing, parseConfig,
+import { BATCH_TEXT, blockedForUser, boundMessage, commitHash, commitText, DEFAULT_BLOCK_REASONS, isCommit, HEADER, MAX_BLOCKS, missing, parseConfig,
   progressFields, stopDecision, tooLong, unboundMessage } from './handoff' // fmt: skip
 
 const PENDING = 'Status: in-progress\nPhase: implementation\nNext step: commit group 2\n'
@@ -91,4 +91,25 @@ test('the unbound message gives the session id and lists the active works', () =
   expect(text).toContain('/r/tmp/handoff/.sessions/s1')
   expect(text).toContain('- other: step 3')
   expect(text).toContain('resumida')
+})
+
+test('a commit is detected in a compound command and its hash read from the output', () => {
+  expect(isCommit('cd ../wt && git add -A && git commit -q -F - <<EOF')).toBe(true)
+  expect(isCommit('git -C ../wt commit -m "x"')).toBe(true)
+  expect([isCommit('git log -1'), isCommit('echo "git commit"'), isCommit('git commit --help')]).toEqual([false, false, false])
+  expect(commitHash('[chore/003-x 70ff3be] chore: y\n 2 files changed')).toBe('70ff3be')
+  expect(commitHash('')).toBeNull()
+})
+
+test('the commit reminder stays quiet once PROGRESS.md names the hash', () => {
+  expect(commitText('lote', 'Done: 001 (abc1234)', 'abc1234')).toBeNull()
+  expect(commitText('lote', 'Done: 001', '70ff3be')).toContain('70ff3be')
+  expect(commitText('lote', 'Done: 001', null)).toContain('git log -1')
+})
+
+test('a batch ends only after its last spec, and done always deletes the handoff', () => {
+  const b = { work: 'lote', folder: 'R/tmp/handoff/lote', branch: 'x', source: 'startup', spec: null, files: {} }
+  expect(boundMessage({ ...b, files: { 'PROGRESS.md': PENDING } }, defaults)).toContain(BATCH_TEXT)
+  const done = boundMessage({ ...b, files: { 'PROGRESS.md': 'Status: done' } }, parseConfig('{"closing": "Cierra."}'))
+  expect(done).toContain('Cierra. Después borra R/tmp/handoff/lote/')
 })

@@ -32,6 +32,8 @@ Done: …   Current: …   Remaining: …   ETA: ~2 h
 Next step: …
 ```
 
+Un **lote** (varias specs seguidas) es un solo trabajo con un solo handoff: las specs no crean el suyo, cada spec cerrada se suma a `Done`, `Next step` pasa a la siguiente y `Status: done` va solo tras la última. Con `Status: done`, el cierre borra la carpeta del trabajo y sus vínculos.
+
 Una sesión se vincula a un trabajo escribiendo su nombre en `tmp/handoff/.sessions/<session_id>` (el plugin le dice su id al iniciar), o sola si la rama lleva el mismo número que el trabajo (`feature/012-x` ↔ `tmp/handoff/012-x/`). Agrega `tmp/` a tu `.gitignore`.
 
 ## Qué hace
@@ -42,10 +44,11 @@ Una sesión se vincula a un trabajo escribiendo su nombre en `tmp/handoff/.sessi
 | Fin del turno (`Stop`) | Lo bloquea mientras haya `Next step` sin `Status: done` o un `blocked` válido. Deja parar en `external-wait` y tras 3 bloqueos seguidos sin cambios en `PROGRESS.md` |
 | `AskUserQuestion` con una spec en curso | Lo rechaza salvo con un `blocked` de una categoría del proyecto: el resto de las decisiones las toma el agente y las anota |
 | Escribir `PROGRESS.md` | Nombra en el acto las líneas de estado demasiado largas |
+| `git commit` en Bash | Si `PROGRESS.md` del trabajo vinculado no cita el hash, pide anotarlo en esa misma respuesta (con `-q` no hay hash y lo pide igual) |
 | Compactación (`/compact` o el umbral automático) | Con un trabajo vinculado, no llama al modelo: conserva los mensajes recientes que caben en ~20k tokens, cortados en un punto seguro, y el handoff entra después. Sin trabajo, compacta como siempre |
 | Spinner y banda | `<Phase> · <Current> · ETA` mientras trabaja; sobre el prompt, estado, fase, ETA y `ctx <n>%`, con un botón `Hide` |
 
-Cada decisión queda en `tmp/handoff/.log/events.jsonl` (`inject`, `stop.block`, `stop.release`, `ask.deny`, `compact.kept`, `compact.fallback`).
+Cada decisión queda en `tmp/handoff/.log/events.jsonl` (`inject`, `stop.block`, `stop.release`, `ask.deny`, `compact.kept`, `compact.fallback`, `commit.remind`).
 
 ## Configuración por proyecto (opcional)
 
@@ -92,6 +95,7 @@ claude --plugin-dir .         # probarlo en una sesión sin instalarlo
 
 ## Versiones
 
+* **0.1.0**: recordatorio del hash en `PROGRESS.md` tras cada `git commit`; un lote es un solo trabajo que termina tras su última spec; con `Status: done` el cierre siempre borra el handoff (también con un `closing` propio).
 * **0.0.1**: primera versión: handoff en disco, Stop, AskUserQuestion, aviso de líneas largas, compactación sin resumen, banda y spinner, configuración por proyecto.
 
 ## Licencia

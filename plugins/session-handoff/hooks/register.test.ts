@@ -92,3 +92,14 @@ test('a PROGRESS.md written with a long status line is named right away', async 
     tool_use_id: 't1', session_id: SESSION }) // fmt: skip
   expect(result.block).toContain('Current')
 })
+
+test('a git commit in Bash asks for its hash in PROGRESS.md until it is there', async ($, on) => {
+  const files = bound()
+  world(on, files)
+  const commit = (stdout: string) =>
+    $.classic.PostToolUse({ tool_name: 'Bash', tool_input: { command: 'git commit -m x' }, tool_response: { stdout },
+      tool_use_id: 't2', session_id: SESSION }) // fmt: skip
+  expect((await commit('[feature/012-x 70ff3be] feat: y')).block).toContain('70ff3be')
+  files[`${ROOT}/tmp/handoff/012-x/PROGRESS.md`] = `${PENDING}Done: grupo 1 (70ff3be)\n`
+  expect((await commit('[feature/012-x 70ff3be] feat: y')).block).toBeUndefined()
+})

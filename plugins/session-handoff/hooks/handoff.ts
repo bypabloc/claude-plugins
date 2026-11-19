@@ -111,9 +111,16 @@ export function continueText(c: Config): string {
     'Para solo tras escribir `Status: done` o `Status: blocked — <categoría>: <motivo>`, con <categoría> una de: ' +
     `${reasonsList(c)}. Toda otra elección es tuya: toma la opción correcta, no la más rápida, ${where(c)} y sigue. ` +
     'Un gate rojo tras 3 intentos se anota igual. Esperar la CI, un merge o un recurso compartido es ' +
-    '`Phase: external-wait`, no blocked. Al retomar, vuelve a poner `Status: in-progress`.'
+    '`Phase: external-wait`, no blocked. Al retomar, vuelve a poner `Status: in-progress`. ' +
+    BATCH_TEXT
   )
 }
+
+/** A work that groups several specs (a batch) keeps one handoff and ends only after the last one. */
+export const BATCH_TEXT =
+  'Un lote (varias specs seguidas) es un solo trabajo con un solo handoff: las specs no crean el suyo. Al cerrar ' +
+  'cada spec, súmala a Done, pon la siguiente en Next step y sigue en el mismo turno; `Status: done` solo tras la ' +
+  'última. Un resumen al usuario a mitad del lote no es un cierre.'
 
 export function decideText(c: Config, reason: string): string {
   return (
@@ -142,7 +149,9 @@ const PHASE_TEXT: Record<(typeof PHASES)[number], string> = {
   'external-wait':
     'Fase external-wait: antes que nada, revisa lo pendiente (checks, un merge ajeno, el recurso compartido). Si se ' +
     'resolvió, pasa a la fase siguiente. No rehagas trabajo terminado.',
-  closing: 'Fase closing: borra los crons del trabajo, cierra su worktree y su handoff, y pon `Status: done`.',
+  closing:
+    'Fase closing: borra los crons del trabajo y cierra su worktree. En un lote con specs en Remaining, vuelve a ' +
+    'implementation con la siguiente; si no queda ninguna, pon `Status: done`.',
 }
 
 const SOURCE_TEXT: Record<string, string> = {
@@ -179,9 +188,8 @@ export function boundMessage(b: Bound, c: Config): string {
   ]
   if (fields.status === 'done') {
     lines.push(
-      c.closing ??
-        `Status es done: solo queda el cierre. Confirma el merge, cierra el worktree si lo hay y borra ${b.folder}/ ` +
-          'y sus vínculos de .sessions/.',
+      `${c.closing ?? 'Status es done: solo queda el cierre. Confirma el merge y cierra el worktree si lo hay.'} ` +
+        `Después borra ${b.folder}/ y sus vínculos de .sessions/.`,
     )
     return lines.join('\n')
   }
@@ -226,6 +234,7 @@ export function unboundMessage(
   const lines = [
     `[session-handoff] Esta sesión (${session}) no tiene trabajo vinculado. Para un trabajo de más de un turno, ` +
       `crea ${base}/<trabajo>/ (PROGRESS.md, DECISIONS.md, NOTES.md) y escribe su nombre en ${base}/.sessions/${session}.`,
+    BATCH_TEXT,
     ...c.context,
   ]
   if (source === 'compact') lines.push('La conversación previa está resumida: relee las instrucciones del proyecto.')
@@ -270,4 +279,25 @@ export function stopDecision(
       `con ${step}, o anota el bloqueo. ${tail}`,
   ]
   return { block: decide ? `[session-handoff] ${decideText(c, fields.reason ?? 'sin motivo')}` : texts[blocks - 1]!, blocks }
+}
+
+/** Whether a Bash command makes a commit (not `git commit --help`, nor a text that names it). */
+export function isCommit(command: string): boolean {
+  const calls = command.matchAll(/(?:^|&&|;|\|\||\n)\s*git\s+(?:-[Cc]\s+\S+\s+)*commit\b([^&;\n]*)/g)
+  return [...calls].some(m => !/--help|--dry-run/.test(m[1] ?? ''))
+}
+
+/** The short hash in `git commit` output (`[branch abc1234] msg`), or null with `-q`. */
+export function commitHash(stdout: string): string | null {
+  return /^\[[^\]\s]+(?: \([^)]*\))? ([0-9a-f]{7,40})\]/m.exec(stdout)?.[1] ?? null
+}
+
+/** The reminder after a commit, or null when PROGRESS.md already names its hash. */
+export function commitText(work: string, progress: string, sha: string | null): string | null {
+  if (sha && progress.includes(sha)) return null
+  return (
+    `[session-handoff] Commit hecho en ${work}: actualiza PROGRESS.md ahora, en esta misma respuesta: el hash ` +
+    `${sha ?? '(git log -1 --format=%h)'} en Done, y Current, Remaining, ETA y Next step con lo siguiente. Con un ` +
+    'Next step viejo, tras compactar se repite trabajo.'
+  )
 }
