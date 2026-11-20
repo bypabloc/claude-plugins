@@ -160,6 +160,32 @@ test('a hash left out survives an interruption: the next prompt and the Stop ask
   expect((after.additionalContext ?? []).join('\n')).not.toContain('b0c1d2e')
 })
 
+test('a hash left out survives /reload-plugins: the store keeps it once the state is gone', async ($, on) => {
+  const files = bound()
+  world(on, files)
+  const kept = new Map<string, unknown>()
+  on('store.get', (_, e) => ({ value: kept.get(e.key) }))
+  on('store.set', (_, e) => (kept.set(e.key, e.value), { value: undefined }))
+  on('store.keys', () => ({ value: [...kept.keys()] }))
+  on('store.delete', (_, e) => (kept.delete(e.key), { value: undefined }))
+  // What a reload does: the plugin's state starts empty again.
+  let reloaded = false
+  on('state.get', (_, e, next) => {
+    if (reloaded && e.key === 'pendingCommits') return (reloaded = false), { value: [] as string[] } as never
+    return next(e)
+  })
+  const commit = await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: { command: 'git commit -m e2e' },
+    tool_response: { stdout: '[feature/012-x 72cfd25] test: e2e' }, tool_use_id: 't6', session_id: SESSION }) // fmt: skip
+  expect(commit.block).toContain('72cfd25')
+  reloaded = true
+  const prompt = await $.classic.UserPromptSubmit({ prompt: 'continue', session_id: SESSION, cwd: ROOT })
+  expect((prompt.additionalContext ?? []).join('\n')).toContain('72cfd25')
+  expect((await $.classic.Stop({ stop_hook_active: false, cwd: ROOT, session_id: SESSION })).block).toContain('72cfd25')
+  files[`${ROOT}/tmp/handoff/012-x/PROGRESS.md`] = `${PENDING}Done: e2e (72cfd25)\n`
+  await $.classic.UserPromptSubmit({ prompt: 'sigue', session_id: SESSION, cwd: ROOT })
+  expect([...kept.keys()].filter(k => k.startsWith('pending/'))).toEqual([])
+})
+
 test('a git commit in a background Bash asks for its own hash once it lands, not the old HEAD', async ($, on) => {
   const files = bound()
   const git: Record<string, string> = { 'rev-parse HEAD': 'a0a0a0a0' }

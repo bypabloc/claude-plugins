@@ -116,9 +116,28 @@ async function pending($: EngineInterface, session: string, add: string[] = []) 
   const work = await currentWork(io, place, session)
   if (!work) return null
   const landed = await landedCommits($, io)
-  const missing = missingHashes([...(await read($, pendingCommits)), ...landed, ...add], await progressOf(io, place, work))
+  const known = [...(await read($, pendingCommits)), ...(await storedPending($, session))]
+  const missing = missingHashes([...known, ...landed, ...add], await progressOf(io, place, work))
   await update($, pendingCommits, () => missing)
+  await keepPending($, session, missing)
   return { io, place, work, missing }
+}
+
+// The hashes still missing are kept in $.store too: /reload-plugins and --resume start the state empty.
+const PENDING_KEY = 'pending/'
+
+async function storedPending($: EngineInterface, session: string): Promise<string[]> {
+  const stored = await $.store.get(PENDING_KEY + session).catch(() => undefined)
+  return Array.isArray(stored) ? stored.filter((h): h is string => typeof h === 'string') : []
+}
+
+async function keepPending($: EngineInterface, session: string, hashes: string[]): Promise<void> {
+  try {
+    if (hashes.length) await $.store.set(PENDING_KEY + session, hashes)
+    else if ((await storedPending($, session)).length) await $.store.delete(PENDING_KEY + session)
+  } catch {
+    // Only a reload would miss them.
+  }
 }
 
 /**
