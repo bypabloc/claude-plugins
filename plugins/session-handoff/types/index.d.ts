@@ -78,6 +78,8 @@ declare module 'claude-code' {
       lastStop: { text: string; blocks: number; waits?: number; at?: number } | null
       /** Hashes of the commits made in this session that PROGRESS.md does not name yet. */
       pendingCommits: string[]
+      /** Commits launched in a background Bash that have not landed yet: their directory and the HEAD at launch. */
+      backgroundCommits: { dir: string; base: string }[]
     }
   }
 }

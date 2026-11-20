@@ -6,7 +6,7 @@ const SESSION = 's1'
 const PENDING = 'Status: in-progress\nPhase: implementation\nNext step: commit group 2\n'
 
 /** Answers the engine's disk, git and session from memory, beneath the plugin. */
-function world(on: On, files: Record<string, string>): void {
+function world(on: On, files: Record<string, string>, git: Record<string, string> = {}): void {
   // The engine hands the paths over as the OS writes them: backslashes on Windows, and on Linux or macOS
   // `D:/r` is relative, so it arrives resolved against the cwd (`/cwd/D:/r/...`).
   const at = (path: string): string => {
@@ -36,7 +36,8 @@ function world(on: On, files: Record<string, string>): void {
       'branch --show-current': 'feature/012-x',
       'log -1 --format=%h': 'b0c1d2e',
     }
-    const stdout = out[e.argv.slice(1).join(' ')]
+    const key = e.argv.slice(1).join(' ')
+    const stdout = git[key] ?? out[key]
     const code = stdout === undefined ? 1 : 0
     return { value: { exitCode: code, stdout: stdout ?? '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
@@ -157,6 +158,24 @@ test('a hash left out survives an interruption: the next prompt and the Stop ask
   files[`${ROOT}/tmp/handoff/012-x/PROGRESS.md`] = `${PENDING}Done: grupo 1 (b0c1d2e)\n`
   const after = await $.classic.UserPromptSubmit({ prompt: 'sigue', session_id: SESSION, cwd: ROOT })
   expect((after.additionalContext ?? []).join('\n')).not.toContain('b0c1d2e')
+})
+
+test('a git commit in a background Bash asks for its own hash once it lands, not the old HEAD', async ($, on) => {
+  const files = bound()
+  const git: Record<string, string> = { 'rev-parse HEAD': 'a0a0a0a0' }
+  world(on, files, git)
+  const launch = await $.classic.PostToolUse({ tool_name: 'Bash',
+    tool_input: { command: 'git commit -m docs', run_in_background: true }, tool_response: {}, tool_use_id: 't5',
+    session_id: SESSION }) // fmt: skip
+  expect(launch.block).toBeUndefined()
+  const stop = () => $.classic.Stop({ stop_hook_active: false, cwd: ROOT, session_id: SESSION })
+  expect((await stop()).block ?? '').not.toContain('b0c1d2e')
+  // The merge of dev and its commits stay out: only the branch's own commits since the launch count.
+  git['log --first-parent --no-merges --format=%h a0a0a0a0..HEAD'] = '9dcf124'
+  expect((await stop()).block).toContain('9dcf124')
+  files[`${ROOT}/tmp/handoff/012-x/PROGRESS.md`] = `${PENDING}Done: docs (9dcf124)\n`
+  const after = await $.classic.UserPromptSubmit({ prompt: 'sigue', session_id: SESSION, cwd: ROOT })
+  expect((after.additionalContext ?? []).join('\n')).not.toContain('9dcf124')
 })
 
 const BAND = {

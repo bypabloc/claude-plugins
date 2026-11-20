@@ -125,6 +125,7 @@ claude --plugin-dir .         # probarlo en una sesión sin instalarlo
 
 ## Versiones
 
+* **0.4.1**: un `git commit` lanzado en un Bash en segundo plano ya pide su hash: antes `git log -1` leía el HEAD previo al commit y el hash nuevo nunca llegaba a Done. Se guarda el HEAD del arranque y el siguiente aviso, mensaje o fin de turno pide los commits propios de la rama desde ahí (sin merges ni commits traídos de dev).
 * **0.4.0**: fila de métricas sobre la línea de estado, entre divisores: costo estimado (total, último turno y promedio), tokens y turnos, tiempo del agente, reuso de caché, última corrida de pruebas y si hubo cambios después, rate limits o burn rate, y salud del handoff (hashes pendientes, compactaciones, `Stop` retenidos y topes). `ctx` cambia de color al acercarse a la compactación; botones `Less`/`More` y `Hide`; los totales sobreviven a `--resume`.
 * **0.3.5**: cada línea de `events.jsonl` lleva `v`, la versión del plugin que la escribió: una sesión que no recargó el plugin se ve en la bitácora sin adivinar por su comportamiento.
 * **0.3.4**: al escribir `PROGRESS.md`, una línea `Phase:` que no empieza con una fase válida se nombra en el acto (sin fase válida, `Stop` no reconoce `external-wait`).

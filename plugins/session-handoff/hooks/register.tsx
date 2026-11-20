@@ -28,6 +28,10 @@ const isHidden = atom({ plugin: 'session-handoff', key: 'isHidden' } as const, f
 const contextPercent = atom({ plugin: 'session-handoff', key: 'contextPercent' } as const, null)
 const lastStop = atom({ plugin: 'session-handoff', key: 'lastStop' } as const, null)
 const pendingCommits = atom({ plugin: 'session-handoff', key: 'pendingCommits' } as const, [] as string[])
+// A commit launched in a background Bash has not run when PostToolUse fires: where and at which HEAD it started.
+const backgroundCommits = atom({ plugin: 'session-handoff', key: 'backgroundCommits' } as const,
+  [] as { dir: string; base: string }[]) // fmt: skip
+const BACKGROUND_KEPT = 5
 const meterState = atom({ plugin: 'session-handoff', key: 'meter' } as const, null)
 const isCompact = atom({ plugin: 'session-handoff', key: 'isCompact' } as const, false)
 
@@ -111,9 +115,29 @@ async function pending($: EngineInterface, session: string, add: string[] = []) 
   const { io, place } = await here($)
   const work = await currentWork(io, place, session)
   if (!work) return null
-  const missing = missingHashes([...(await read($, pendingCommits)), ...add], await progressOf(io, place, work))
+  const landed = await landedCommits($, io)
+  const missing = missingHashes([...(await read($, pendingCommits)), ...landed, ...add], await progressOf(io, place, work))
   await update($, pendingCommits, () => missing)
   return { io, place, work, missing }
+}
+
+/**
+ * The commits background Bash commits have made since they started. Only the branch's own commits count (first
+ * parent, no merges), so a merge of dev brings in nobody else's; a commit that has not landed yet keeps waiting.
+ */
+async function landedCommits($: EngineInterface, io: Io): Promise<string[]> {
+  const watched = await read($, backgroundCommits)
+  if (!watched.length) return []
+  const landed: string[] = []
+  const waiting: typeof watched = []
+  for (const w of watched) {
+    const own = await io.git(w.dir, ['log', '--first-parent', '--no-merges', '--format=%h', `${w.base}..HEAD`])
+    const hashes = own.split('\n').map(h => h.trim()).filter(Boolean).reverse()
+    if (hashes.length) landed.push(...hashes)
+    else waiting.push(w)
+  }
+  await update($, backgroundCommits, () => waiting)
+  return landed
 }
 
 /** After a `git commit` in Bash, asks for every hash PROGRESS.md of the bound work still lacks, this one included. */
@@ -128,6 +152,13 @@ async function afterCommit<R extends { block?: string }>(
   if (typeof command === 'string') await recordTests($, command, [stdout, response?.stderr])
   if (result.block || typeof command !== 'string' || !isCommit(command)) return result
   const cwd = e.cwd || (await $.session.cwd())
+  if ((e.tool_input as { run_in_background?: unknown }).run_in_background === true) {
+    // `git log -1` now would name the HEAD before the commit: the next hook reads what it made.
+    const dir = commitDir(command, cwd)
+    const base = await ioOf($).git(dir, ['rev-parse', 'HEAD'])
+    if (base) await update($, backgroundCommits, w => [...w, { dir, base }].slice(-BACKGROUND_KEPT))
+    return result
+  }
   const sha = commitHash(typeof stdout === 'string' ? stdout : '') ??
     ((await ioOf($).git(commitDir(command, cwd), ['log', '-1', '--format=%h'])) || null)
   const state = await pending($, e.session_id, sha ? [sha] : [])
