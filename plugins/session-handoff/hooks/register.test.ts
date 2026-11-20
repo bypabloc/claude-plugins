@@ -127,6 +127,21 @@ test('a PROGRESS.md written with a phase that is not one is named right away', a
   expect((await write()).block).toBeUndefined()
 })
 
+test('a second Phase line is named right away: Stop reads only the first one', async ($, on) => {
+  const path = `${ROOT}/tmp/handoff/012-x/PROGRESS.md`
+  const two = 'Status: in-progress\nPhase: implementation (grupo 4)\nNext step: y\n\n' +
+    'Phase: external-wait (gate en segundo plano)\n\n## Espera\n- gate'
+  const files = bound({ [path]: two })
+  world(on, files)
+  const write = () => $.classic.PostToolUse({ tool_name: 'Edit', tool_input: { file_path: path }, tool_response: {},
+    tool_use_id: 't7', session_id: SESSION }) // fmt: skip
+  const warned = (await write()).block ?? ''
+  expect(warned).toContain('Phase')
+  expect(warned).toContain('implementation')
+  files[path] = 'Status: in-progress\nPhase: external-wait (gate en segundo plano)\nNext step: y\n\n## Espera\n- gate'
+  expect((await write()).block).toBeUndefined()
+})
+
 test('a PROGRESS.md written with a long status line is named right away', async ($, on) => {
   const path = `${ROOT}/tmp/handoff/012-x/PROGRESS.md`
   world(on, bound({ [path]: `Status: in-progress\nCurrent: ${'x'.repeat(130)}\nNext step: y` }))

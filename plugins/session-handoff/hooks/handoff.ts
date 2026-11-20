@@ -6,7 +6,7 @@
 import type { HandoffConfig, WorkStatus } from '../types'
 
 /** The plugin version; equal to `.claude-plugin/plugin.json` (checked on every release). Each log line carries it. */
-export const VERSION = '0.4.3'
+export const VERSION = '0.4.4'
 
 export const FILES =['PROGRESS.md', 'DECISIONS.md', 'NOTES.md'] as const
 export const PHASES = ['implementation', 'verification', 'integration', 'external-wait', 'closing'] as const
@@ -280,6 +280,22 @@ export function badPhaseText(progress: string): string | null {
   return (
     `[session-handoff] \`Phase: ${value.slice(0, 60)}\` no es una fase: empieza la línea con ${PHASES.join(', ')} ` +
     '(una nota puede ir después). Sin una fase válida, Stop no reconoce external-wait.'
+  )
+}
+
+/** Lines Stop decides on: a second one is ignored, so the agent believes a state the plugin never sees. */
+const SINGLE = ['Status', 'Phase', 'Next step'] as const
+
+/** The warning for a Status, Phase or Next step line written more than once (only the first counts), or null. */
+export function duplicateText(progress: string): string | null {
+  const repeated = SINGLE.flatMap(label => {
+    const lines = [...progress.matchAll(new RegExp(`^[\\s>*\\-]*\\**${label}\\**\\s*:\\**\\s*(.+?)\\s*$`, 'gim'))]
+    return lines.length > 1 ? [`\`${label}:\` (cuenta \`${lines[0]![1]!.slice(0, 50)}\`)`] : []
+  })
+  if (!repeated.length) return null
+  return (
+    `[session-handoff] PROGRESS.md repite ${repeated.join(', ')}: Stop lee solo la primera de cada una. ` +
+    'Deja una sola línea por etiqueta, arriba, y borra las demás.'
   )
 }
 

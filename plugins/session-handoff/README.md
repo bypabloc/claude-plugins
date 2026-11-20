@@ -125,6 +125,9 @@ claude --plugin-dir .         # probarlo en una sesión sin instalarlo
 
 ## Versiones
 
+El detalle de cada versión (síntoma, causa, prueba y lección), la vigilancia en sesiones reales y lo aprendido están en [docs/bitacora/](docs/bitacora/).
+
+* **0.4.4**: al escribir `PROGRESS.md`, una línea `Status:`, `Phase:` o `Next step:` repetida se nombra en el acto: `Stop` lee solo la primera, y una segunda `Phase: external-wait` más abajo dejaba la sesión bloqueada hasta el tope creyendo que esperaba.
 * **0.4.3**: la nota de `Phase:` cuenta para el máximo de 120 caracteres. Desde 0.3.3 solo se medía la palabra de la fase, y una nota que crecía con cada avance llegó a más de 1000 caracteres, reinyectada en cada inicio y compactación; ahora se avisa al escribir PROGRESS.md.
 * **0.4.2**: los hashes que PROGRESS.md aún no nombra sobreviven a `/reload-plugins` y a `--resume`: se guardan también en el store de la sesión, y el aviso del siguiente mensaje y de `Stop` los sigue pidiendo (antes, recargar el plugin los borraba y `Stop` soltaba sin ellos).
 * **0.4.1**: un `git commit` lanzado en un Bash en segundo plano ya pide su hash: antes `git log -1` leía el HEAD previo al commit y el hash nuevo nunca llegaba a Done. Se guarda el HEAD del arranque y el siguiente aviso, mensaje o fin de turno pide los commits propios de la rama desde ahí (sin merges ni commits traídos de dev).

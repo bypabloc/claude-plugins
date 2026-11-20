@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, SessionMessage } from 'claude-code'
 
 import type { Meter, WorkStatus } from '../types'
-import { askDeniedText, badPhaseText, blockedForUser, boundMessage, commitDir, commitHash, isCommit, longText, missingHashes,
+import { askDeniedText, badPhaseText, blockedForUser, boundMessage, commitDir, commitHash, duplicateText, isCommit, longText, missingHashes,
   pendingText, progressFields, stopDecision, tooLong, unboundMessage } from './handoff' // fmt: skip
 import { addTurn, type Cell, cells, contextTone, emptyMeter, testCounts } from './metrics'
 import { bandText, keepsMessage, spinnerWord, STATUS_COLOR } from './status'
@@ -273,7 +273,8 @@ export const register: Register = on => {
     await pending($, e.session_id)
     const text = await $.fs.read(path).then(t => t as string, () => '')
     const long = tooLong(progressFields(text))
-    const notes = [long.length ? longText(long) : null, badPhaseText(text)].filter(Boolean).join('\n')
+    const notes = [long.length ? longText(long) : null, badPhaseText(text), duplicateText(text)]
+      .filter(Boolean).join('\n') // fmt: skip
     return notes ? { ...result, block: notes } : result
   })
 
