@@ -6,7 +6,8 @@ const SESSION = 's1'
 const PENDING = 'Status: in-progress\nPhase: implementation\nNext step: commit group 2\n'
 
 /** Answers the engine's disk, git and session from memory, beneath the plugin. */
-function world(on: On, files: Record<string, string>, git: Record<string, string> = {}): void {
+function world(on: On, files: Record<string, string>, git: Record<string, string> = {},
+  mtimes: Record<string, number> = {}): void { // fmt: skip
   // The engine hands the paths over as the OS writes them: backslashes on Windows, and on Linux or macOS
   // `D:/r` is relative, so it arrives resolved against the cwd (`/cwd/D:/r/...`).
   const at = (path: string): string => {
@@ -27,7 +28,8 @@ function world(on: On, files: Record<string, string>, git: Record<string, string
     const names = new Set<string>()
     for (const p of Object.keys(files)) if (p.startsWith(`${dir}/`)) names.add(p.slice(dir.length + 1).split('/')[0]!)
     const kind = (name: string) => (files[`${dir}/${name}`] === undefined ? 'dir' : 'file') as 'dir' | 'file'
-    return { value: [...names].map(name => ({ name, kind: kind(name), size: 0, mtimeMs: 0, isLink: false })) }
+    const mtime = (name: string) => mtimes[`${dir}/${name}`] ?? 0
+    return { value: [...names].map(name => ({ name, kind: kind(name), size: 0, mtimeMs: mtime(name), isLink: false })) }
   })
   on('process.run', (_, e) => {
     const out: Record<string, string> = {
@@ -79,6 +81,20 @@ test('Stop blocks while the next step is pending and lets go once done', async (
   files[`${ROOT}/tmp/handoff/012-x/PROGRESS.md`] = 'Status: done\nNext step: none'
   expect((await $.classic.Stop({ stop_hook_active: true, cwd: ROOT, session_id: SESSION })).block).toBeUndefined()
   expect(files[`${ROOT}/tmp/handoff/.log/events.jsonl`]).toContain('"stop.release"')
+})
+
+test('a session whose work another session bound later is not pushed to go on: the newer one took it over', async ($, on) => {
+  const sessions = `${ROOT}/tmp/handoff/.sessions`
+  const files = bound({ [`${sessions}/s2`]: '012-x', [`${sessions}/s3`]: 'otro' })
+  world(on, files, {}, { [`${sessions}/${SESSION}`]: 1_000, [`${sessions}/s2`]: 2_000, [`${sessions}/s3`]: 3_000 })
+  expect((await $.classic.Stop({ stop_hook_active: false, cwd: ROOT, session_id: SESSION })).block).toBeUndefined()
+  expect(files[`${ROOT}/tmp/handoff/.log/events.jsonl`]).toContain('"reason":"handed-off"')
+})
+
+test('a session bound after the other one on the same work is still pushed to go on', async ($, on) => {
+  const sessions = `${ROOT}/tmp/handoff/.sessions`
+  world(on, bound({ [`${sessions}/s2`]: '012-x' }), {}, { [`${sessions}/${SESSION}`]: 2_000, [`${sessions}/s2`]: 1_000 })
+  expect((await $.classic.Stop({ stop_hook_active: false, cwd: ROOT, session_id: SESSION })).block).toContain('012-x')
 })
 
 test('touching PROGRESS.md between quick stops does not reset the cap', async ($, on) => {

@@ -15,6 +15,7 @@ sesiones reales y qué se aprendió en el camino. Es el changelog largo; el cort
 
 | Versión | Fecha | Commit | Resumen |
 | :--- | :--- | :--- | :--- |
+| [0.4.5](versiones/0.4.5.md) | 2026-11-20 | ver el tag `session-handoff-v0.4.5` | Una sesión cuyo trabajo tomó otra ya no es empujada a seguir. |
 | [0.4.4](versiones/0.4.4.md) | 2026-11-20 | `f2fe629` | Una línea `Status`, `Phase` o `Next step` repetida se nombra al escribir. |
 | [0.4.3](versiones/0.4.3.md) | 2026-11-19 | `e90e03d` | La nota de `Phase:` cuenta para el máximo de 120 caracteres. |
 | [0.4.2](versiones/0.4.2.md) | 2026-11-19 | `5f404ef` | Los hashes pendientes sobreviven a `/reload-plugins` y `--resume`. |

@@ -7,7 +7,7 @@ import { askDeniedText, badPhaseText, blockedForUser, boundMessage, commitDir, c
 import { addTurn, type Cell, cells, contextTone, emptyMeter, testCounts } from './metrics'
 import { bandText, keepsMessage, spinnerWord, STATUS_COLOR } from './status'
 import { activeWorks, boundOf, configOf, currentWork, handoffDir, type Io, logEvent, type Place, placeOf,
-  progressOf, specOf, statusOf } from './store' // fmt: skip
+  progressOf, specOf, statusOf, takenOverBy } from './store' // fmt: skip
 import { keepTail, slim } from './tail'
 
 // ponytail: chars/4 ≈ tokens; ~20k tokens kept verbatim. Thinking and nested rules ride along unseen.
@@ -230,6 +230,11 @@ export const register: Register = on => {
       await bump($, m => ({ ...m, stopBlocks: m.stopBlocks + 1 }))
       await logEvent(io, place.store, { event: 'stop.commits', session: e.session_id, work })
       return { ...result, block: reminder }
+    }
+    const owner = await takenOverBy(io, place, e.session_id, work)
+    if (owner) {
+      await logEvent(io, place.store, { event: 'stop.release', session: e.session_id, reason: 'handed-off', owner })
+      return result
     }
     const config = await configOf(io, place.root)
     const progress = await progressOf(io, place, work)

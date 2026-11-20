@@ -10,7 +10,7 @@ import { type Bound, type Config, FILES, parseConfig, progressFields, VERSION } 
 export type Io = {
   read: (path: string) => Promise<string | null>
   write: (path: string, text: string) => Promise<void>
-  list: (path: string) => Promise<Array<{ name: string; kind: string }>>
+  list: (path: string) => Promise<Array<{ name: string; kind: string; mtimeMs?: number }>>
   git: (cwd: string, args: string[]) => Promise<string>
 }
 
@@ -50,6 +50,22 @@ export async function currentWork(io: Io, place: Place, session: string): Promis
   }
   const number = SPEC_NUMBER.exec(place.branch)?.[1]
   return (number && works.find(w => w.startsWith(`${number}-`))) || null
+}
+
+/**
+ * The session that bound itself to the same work after this one, or null. The newest link owns the work: the
+ * older session is not pushed to go on, or two agents edit the same tree.
+ */
+export async function takenOverBy(io: Io, place: Place, session: string, work: string): Promise<string | null> {
+  const dir = `${handoffDir(place.store)}/.sessions`
+  const links = await io.list(dir).catch(() => [])
+  const mine = links.find(l => l.name === session)?.mtimeMs
+  if (mine === undefined) return null
+  for (const link of links) {
+    if (link.name === session || link.kind !== 'file' || (link.mtimeMs ?? 0) <= mine) continue
+    if ((await io.read(`${dir}/${link.name}`))?.trim() === work) return link.name
+  }
+  return null
 }
 
 /** The spec folder whose number matches the work's or the branch's, relative to the root. */
