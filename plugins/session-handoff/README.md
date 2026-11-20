@@ -125,6 +125,7 @@ claude --plugin-dir .         # probarlo en una sesión sin instalarlo
 
 ## Versiones
 
+* **0.4.3**: la nota de `Phase:` cuenta para el máximo de 120 caracteres. Desde 0.3.3 solo se medía la palabra de la fase, y una nota que crecía con cada avance llegó a más de 1000 caracteres, reinyectada en cada inicio y compactación; ahora se avisa al escribir PROGRESS.md.
 * **0.4.2**: los hashes que PROGRESS.md aún no nombra sobreviven a `/reload-plugins` y a `--resume`: se guardan también en el store de la sesión, y el aviso del siguiente mensaje y de `Stop` los sigue pidiendo (antes, recargar el plugin los borraba y `Stop` soltaba sin ellos).
 * **0.4.1**: un `git commit` lanzado en un Bash en segundo plano ya pide su hash: antes `git log -1` leía el HEAD previo al commit y el hash nuevo nunca llegaba a Done. Se guarda el HEAD del arranque y el siguiente aviso, mensaje o fin de turno pide los commits propios de la rama desde ahí (sin merges ni commits traídos de dev).
 * **0.4.0**: fila de métricas sobre la línea de estado, entre divisores: costo estimado (total, último turno y promedio), tokens y turnos, tiempo del agente, reuso de caché, última corrida de pruebas y si hubo cambios después, rate limits o burn rate, y salud del handoff (hashes pendientes, compactaciones, `Stop` retenidos y topes). `ctx` cambia de color al acercarse a la compactación; botones `Less`/`More` y `Hide`; los totales sobreviven a `--resume`.

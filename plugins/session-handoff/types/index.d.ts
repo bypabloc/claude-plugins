@@ -4,6 +4,8 @@ export type WorkStatus = {
   status?: string
   reason?: string
   phase?: string
+  /** What follows the phase word on its line (`external-wait (gate en segundo plano)`). */
+  phase_note?: string
   done?: string
   current?: string
   remaining?: string

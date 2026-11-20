@@ -6,7 +6,7 @@
 import type { HandoffConfig, WorkStatus } from '../types'
 
 /** The plugin version; equal to `.claude-plugin/plugin.json` (checked on every release). Each log line carries it. */
-export const VERSION = '0.4.2'
+export const VERSION = '0.4.3'
 
 export const FILES =['PROGRESS.md', 'DECISIONS.md', 'NOTES.md'] as const
 export const PHASES = ['implementation', 'verification', 'integration', 'external-wait', 'closing'] as const
@@ -70,7 +70,7 @@ export function parseConfig(text: string | null): Config {
 
 /** The status lines of PROGRESS.md (bulleted or bold allowed), the missing ones left out. */
 export function progressFields(text: string): Omit<WorkStatus, 'work'> {
-  const found: Partial<Record<Key | 'reason', string>> = {}
+  const found: Partial<Record<Key | 'reason' | 'phase_note', string>> = {}
   for (const [key, label] of Object.entries(LABELS) as [Key, string][]) {
     const pattern = new RegExp(`^[\\s>*\\-]*\\**${label}\\**\\s*:\\**\\s*(.+?)\\s*$`, 'im')
     const value = pattern.exec(text)?.[1]?.replace(/^[*\s]+|[*\s]+$/g, '')
@@ -84,8 +84,12 @@ export function progressFields(text: string): Omit<WorkStatus, 'work'> {
   }
   // The phase may carry a note after it (`external-wait (commit en segundo plano)`): only the leading word counts.
   const phase = /^[a-z-]+/i.exec(found.phase ?? '')?.[0]?.toLowerCase()
-  if (phase && (PHASES as readonly string[]).includes(phase)) found.phase = phase
-  else delete found.phase
+  if (phase && (PHASES as readonly string[]).includes(phase)) {
+    // The note still weighs on the line: tooLong measures it with the phase.
+    const note = (found.phase ?? '').slice(phase.length).trim()
+    found.phase = phase
+    if (note) found.phase_note = note
+  } else delete found.phase
   return found
 }
 
@@ -97,7 +101,11 @@ export function blockedForUser(fields: Omit<WorkStatus, 'work'>, config: Config)
 
 /** Labels whose line is over LINE_MAX characters (Status counts its reason). */
 export function tooLong(fields: Omit<WorkStatus, 'work'>): string[] {
-  const sizes: Partial<Record<Key, string>> = { ...fields, status: `${fields.status ?? ''} — ${fields.reason ?? ''}` }
+  const sizes: Partial<Record<Key, string>> = {
+    ...fields,
+    status: `${fields.status ?? ''} — ${fields.reason ?? ''}`,
+    phase: [fields.phase, fields.phase_note].filter(Boolean).join(' '),
+  }
   return (Object.entries(LABELS) as [Key, string][]).filter(([k]) => (sizes[k] ?? '').length > LINE_MAX).map(([, l]) => l)
 }
 

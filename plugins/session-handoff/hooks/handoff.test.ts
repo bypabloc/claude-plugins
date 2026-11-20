@@ -48,6 +48,13 @@ test('a status line over 120 characters is named', () => {
   expect(tooLong(progressFields(PENDING))).toEqual([])
 })
 
+test('a phase note counts toward the line: only the leading word is the phase, the whole line is measured', () => {
+  const long = progressFields(`Phase: external-wait (revisión visual: ${'revisadas 36 de 47; '.repeat(8)})`)
+  expect(long.phase).toBe('external-wait')
+  expect(tooLong(long)).toEqual(['Phase'])
+  expect(tooLong(progressFields('Phase: external-wait (reintento commit ciclo 3, PID 2499229)'))).toEqual([])
+})
+
 test('Stop blocks up to the cap while the next step is pending, then lets the turn end', () => {
   let previous: { text: string; blocks: number } | null = null
   for (let i = 1; i <= MAX_BLOCKS; i++) {
